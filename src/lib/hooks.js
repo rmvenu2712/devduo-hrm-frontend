@@ -4,6 +4,10 @@ export function useResource(path) {
   const [state, setState] = useState({ data: null, loading: true, error: null });
   const [version, setVersion] = useState(0);
   useEffect(() => {
+    if (!path) {
+      setState({ data: null, loading: false, error: null });
+      return undefined;
+    }
     const controller = new AbortController();
     setState({ data: null, loading: true, error: null });
     api(path, { signal: controller.signal })

@@ -7,7 +7,7 @@ vi.mock('../../../lib/auth', () => ({ useAuth: () => ({ can: (key) => key.split(
 vi.mock('../../../lib/api', async (load) => ({ ...(await load()), api: vi.fn() }));
 import { api } from '../../../lib/api';
 import { ToastProvider } from '../../../components/ui';
-import { AnnouncementsPage, KnowledgePage, SurveysPage, TicketDetailPage, TicketListPage } from '../ExperiencePages';
+import { AnnouncementsPage, KnowledgePage, RecognitionPage, SurveysPage, TicketDetailPage, TicketListPage } from '../ExperiencePages';
 import { calls, mockApi } from '../../payroll/__tests__/helpers';
 
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
@@ -35,12 +35,40 @@ describe('HR helpdesk', () => {
     expect(screen.getByLabelText('Internal note (visible to HR service staff only)')).toBeInTheDocument();
   });
 
+  it('lets ticket managers record a private escalation reason', async () => {
+    permissions = ['experience.ticket.manage'];
+    let escalated = false;
+    const ticketView = () => ({ uuid: 't1', subject: 'Payslip question', category: { name: 'Payroll' }, status: 'open', description: 'Need help', comments: [], escalations: escalated ? [{ uuid: 'e1', type: 'manual', level: 1, reason: 'Payroll deadline at risk' }] : [] });
+    mockApi(api, {
+      '/tickets/t1/escalate': () => { escalated = true; return { uuid: 'e1', priority: 'high' }; },
+      '/tickets/t1': ticketView,
+    });
+    render(wrap(<Routes><Route path="/experience/tickets/:uuid" element={<TicketDetailPage />} /></Routes>, '/experience/tickets/t1'));
+    fireEvent.change(await screen.findByLabelText('Escalation reason'), { target: { value: 'Payroll deadline at risk' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Escalate' }));
+    await screen.findByText(/Level 1 · manual: Payroll deadline at risk/);
+    expect(calls(api, '/tickets/t1/escalate')).toHaveLength(1);
+  });
+
   it('shows the employee request list and new request action', async () => {
     permissions = ['experience.self'];
     mockApi(api, { '/tickets': { data: [{ uuid: 't1', subject: 'Payslip question', category: { name: 'Payroll' }, status: 'open', employee: { name: 'Asha Rao' } }] } });
     render(wrap(<TicketListPage />));
     expect(await screen.findByText('Payslip question')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New request' })).toBeInTheDocument();
+  });
+
+  it('filters the service queue by assigned owner', async () => {
+    permissions = ['experience.ticket.manage'];
+    mockApi(api, {
+      '/service-categories': [],
+      '/tickets/assignees': [{ id: 7, name: 'HR Agent' }],
+      '/tickets?assignee=7': { data: [] },
+    });
+    render(wrap(<TicketListPage />));
+    fireEvent.change(await screen.findByLabelText('Queue assignment'), { target: { value: '7' } });
+    await screen.findByText('No requests found.');
+    expect(calls(api, '/tickets?assignee=7', 'GET')).toHaveLength(1);
   });
 
   it('renders searchable published guidance', async () => {
@@ -94,5 +122,18 @@ describe('HR helpdesk', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit anonymous response' }));
     await screen.findByRole('button', { name: 'Submit anonymous response' });
     expect(calls(api, '/surveys/s1/responses')).toHaveLength(1);
+  });
+
+  it('lets an employee opt out of receiving recognition', async () => {
+    permissions = ['experience.self'];
+    mockApi(api, {
+      '/recognitions/preference': (path, opts) => opts.method === 'PUT' ? { opted_out: true } : { opted_out: false },
+      '/recognitions/recipients?search=': [],
+      '/recognitions': { data: [] },
+    });
+    render(wrap(<RecognitionPage />));
+    const toggle = await screen.findByRole('checkbox', { name: 'Opt out of receiving recognition' });
+    fireEvent.click(toggle);
+    expect(await screen.findByRole('checkbox', { name: 'Opt out of receiving recognition' })).toBeChecked();
   });
 });
