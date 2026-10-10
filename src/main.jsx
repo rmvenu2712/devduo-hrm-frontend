@@ -27,6 +27,7 @@ import { leaveRoutes } from './routes/leaveRoutes';
 import { leaveHrRoutes } from './routes/leaveHrRoutes';
 import { payrollRoutes } from './routes/payrollRoutes';
 import { recruitmentRoutes } from './routes/recruitmentRoutes';
+import { lifecycleRoutes } from './routes/lifecycleRoutes';
 function Protected() {
   const { session, loading, error, refresh } = useAuth(),
     location = useLocation();
@@ -107,6 +108,7 @@ createRoot(document.getElementById('root')).render(
                     {leaveHrRoutes}
                     {payrollRoutes}
                     {recruitmentRoutes}
+                    {lifecycleRoutes}
                     <Route
                       path="my-work"
                       element={

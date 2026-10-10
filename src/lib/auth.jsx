@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
   // A permission may be a pipe-separated list (any of): 'people.view|people.directory'.
   const can = (p) => !p || p.split('|').some((key) => Boolean(session?.permissions.includes(key)));
   const enabled = (m) =>
-    !m || Boolean((session?.tenant.settings?.modules || ['work', 'notifications', 'people', 'attendance', 'leave', 'payroll', 'recruitment']).includes(m));
+    !m || Boolean((session?.tenant.settings?.modules || ['work', 'notifications', 'people', 'attendance', 'leave', 'payroll', 'recruitment', 'lifecycle']).includes(m));
   return (
     <Context.Provider
       value={{ session, loading, error, expired, login, logout, refresh, can, enabled }}
