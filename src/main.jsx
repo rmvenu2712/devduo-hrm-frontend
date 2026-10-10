@@ -30,6 +30,7 @@ import { recruitmentRoutes } from './routes/recruitmentRoutes';
 import { lifecycleRoutes } from './routes/lifecycleRoutes';
 import { performanceRoutes } from './routes/performanceRoutes';
 import { learningRoutes } from './routes/learningRoutes';
+import { experienceRoutes } from './routes/experienceRoutes';
 function Protected() {
   const { session, loading, error, refresh } = useAuth(),
     location = useLocation();
@@ -113,6 +114,7 @@ createRoot(document.getElementById('root')).render(
                     {lifecycleRoutes}
                     {performanceRoutes}
                     {learningRoutes}
+                    {experienceRoutes}
                     <Route
                       path="my-work"
                       element={

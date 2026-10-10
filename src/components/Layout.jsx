@@ -38,6 +38,7 @@ import { recruitmentNavItem } from '../routes/recruitmentRoutes';
 import { lifecycleNavItem } from '../routes/lifecycleRoutes';
 import { performanceNavItem } from '../routes/performanceRoutes';
 import { learningNavItem } from '../routes/learningRoutes';
+import { experienceNavItem } from '../routes/experienceRoutes';
 import { Avatar, Badge, Button, Dropdown, Drawer, Breadcrumb, useToast } from './ui';
 export const organizationTypes = {
   'legal-entities': 'Legal entities',
@@ -96,6 +97,7 @@ export default function Layout() {
     lifecycleNavItem,
     performanceNavItem,
     learningNavItem,
+    experienceNavItem,
   ];
   const admin = [
     { to: '/users', label: 'People & access', icon: Users, permission: 'users.view' },
