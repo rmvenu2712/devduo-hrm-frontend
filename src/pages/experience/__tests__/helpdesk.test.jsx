@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 let permissions = [];
@@ -7,8 +7,8 @@ vi.mock('../../../lib/auth', () => ({ useAuth: () => ({ can: (key) => key.split(
 vi.mock('../../../lib/api', async (load) => ({ ...(await load()), api: vi.fn() }));
 import { api } from '../../../lib/api';
 import { ToastProvider } from '../../../components/ui';
-import { TicketDetailPage, TicketListPage } from '../ExperiencePages';
-import { mockApi } from '../../payroll/__tests__/helpers';
+import { AnnouncementsPage, KnowledgePage, SurveysPage, TicketDetailPage, TicketListPage } from '../ExperiencePages';
+import { calls, mockApi } from '../../payroll/__tests__/helpers';
 
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const wrap = (ui, path = '/') => <ToastProvider><MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter></ToastProvider>;
@@ -41,5 +41,58 @@ describe('HR helpdesk', () => {
     render(wrap(<TicketListPage />));
     expect(await screen.findByText('Payslip question')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New request' })).toBeInTheDocument();
+  });
+
+  it('renders searchable published guidance', async () => {
+    permissions = ['experience.self'];
+    mockApi(api, { '/knowledge': { data: [{ uuid: 'a1', title: 'Payroll dates', summary: 'When payroll is processed', locale: 'en', version: 2, status: 'published', visibility: 'employee' }] } });
+    render(wrap(<KnowledgePage />));
+    expect(await screen.findByText('Payroll dates')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search articles'), { target: { value: 'payroll' } });
+  });
+
+  it('suggests relevant knowledge articles while an employee writes a ticket', async () => {
+    permissions = ['experience.self'];
+    mockApi(api, {
+      '/service-categories': [{ uuid: 'cat1', name: 'Payroll' }],
+      '/tickets': { data: [] },
+      '/knowledge': { data: [{ uuid: 'a1', title: 'Payslip help', summary: 'Find your payslip' }] },
+    });
+    render(wrap(<TicketListPage />));
+    fireEvent.click(await screen.findByRole('button', { name: 'New request' }));
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Payslip access issue' } });
+    expect(await screen.findByRole('link', { name: 'Payslip help' })).toHaveAttribute('href', '/experience/knowledge/a1');
+  });
+
+  it('lets employees mark an announcement read and acknowledge it', async () => {
+    permissions = ['experience.self'];
+    mockApi(api, {
+      '/announcements/notice1/read': { uuid: 'notice1', read_at: '2026-10-10T10:00:00Z' },
+      '/announcements/notice1/acknowledge': { uuid: 'notice1', read_at: '2026-10-10T10:00:00Z', acknowledged_at: '2026-10-10T10:02:00Z' },
+      '/announcements': { data: [{ uuid: 'notice1', title: 'Benefits enrollment', body: 'Please review the plans.', status: 'published', acknowledgment_required: true, publish_at: '2026-10-10', read_at: null, acknowledged_at: null }] },
+    });
+    render(wrap(<AnnouncementsPage />));
+    expect(await screen.findByText('Benefits enrollment')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as read' }));
+    await screen.findByRole('button', { name: 'Acknowledge' });
+    expect(calls(api, '/announcements/notice1/read')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }));
+    await screen.findByRole('button', { name: 'Acknowledge' });
+    expect(calls(api, '/announcements/notice1/acknowledge')).toHaveLength(1);
+  });
+
+  it('submits anonymous rating survey answers without showing identity', async () => {
+    permissions = ['experience.self'];
+    mockApi(api, {
+      '/surveys/s1/responses': { submitted: true },
+      '/surveys': { data: [{ uuid: 's1', title: 'Team pulse', status: 'published', submitted: false, questions: [{ uuid: 'q1', prompt: 'Is workload manageable?', kind: 'rating', scale: [1, 2, 3, 4, 5] }] }] },
+    });
+    render(wrap(<SurveysPage />));
+    expect(await screen.findByText('Team pulse')).toBeInTheDocument();
+    expect(screen.getByText(/Anonymous survey/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Is workload manageable?'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit anonymous response' }));
+    await screen.findByRole('button', { name: 'Submit anonymous response' });
+    expect(calls(api, '/surveys/s1/responses')).toHaveLength(1);
   });
 });
