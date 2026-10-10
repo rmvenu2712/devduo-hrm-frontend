@@ -18,6 +18,34 @@ function ArticleSuggestions({ values }) {
   return <div className="mb-3 rounded-lg bg-brand-50 p-3 dark:bg-brand-950"><p className="mb-2 text-xs font-semibold">These articles may help</p><ul className="m-0 list-disc pl-5 text-xs">{list.rows.map((a) => <li key={a.uuid}><Link to={`/experience/knowledge/${a.uuid}`} className="underline">{a.title}</Link></li>)}</ul></div>;
 }
 
+const COMMUNICATION_CATEGORIES = ['announcements', 'surveys', 'recognition', 'events'];
+const defaultChannels = Object.fromEntries(COMMUNICATION_CATEGORIES.map((category) => [category, { in_app: true, email: false }]));
+
+export function CommunicationPreferencesPage() {
+  const [channels, setChannels] = useState(defaultChannels);
+  const preferences = useList(paths.communicationPreferences);
+  const actions = useDo();
+  useEffect(() => {
+    const value = preferences.data?.channels;
+    if (value) setChannels(Object.fromEntries(COMMUNICATION_CATEGORIES.map((category) => [category, { ...defaultChannels[category], ...(value[category] ?? {}) }])));
+  }, [preferences.data]);
+  async function save(event) {
+    event.preventDefault();
+    const result = await actions.run('save', () => send('PUT', paths.communicationPreferences, { channels }), 'Communication preferences saved');
+    if (result) preferences.reload();
+  }
+  return <Page permission="experience.self" title="Communication preferences" description="Choose how optional employee experience updates reach you.">
+    {preferences.loading ? <Skeleton /> : preferences.error ? <ErrorState error={preferences.error} onRetry={preferences.reload} /> : <Card><form className="space-y-5" onSubmit={save}>
+      {COMMUNICATION_CATEGORIES.map((category) => <fieldset key={category} className="border-b border-slate-200 pb-4 last:border-0 dark:border-slate-700"><legend className="mb-2 text-sm font-semibold capitalize">{category}</legend><div className="flex flex-wrap gap-x-6 gap-y-2">
+        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(channels[category]?.in_app)} onChange={(e) => setChannels((all) => ({ ...all, [category]: { ...all[category], in_app: e.target.checked } }))} />In-app notifications</label>
+        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(channels[category]?.email)} onChange={(e) => setChannels((all) => ({ ...all, [category]: { ...all[category], email: e.target.checked } }))} />Email preference (available when email delivery is configured)</label>
+      </div></fieldset>)}
+      <Button type="submit" disabled={Boolean(actions.busy)}>Save preferences</Button>
+    </form></Card>}
+    <p className="mt-3 text-xs text-slate-500">Required announcements that need acknowledgment are still delivered in-app. Email choices are saved for future channel integrations; email delivery is not active yet.</p>
+  </Page>;
+}
+
 export function TicketListPage() {
   const { can } = useAuth();
   const [create, setCreate] = useState(false);
@@ -101,27 +129,35 @@ export function AnnouncementsPage() {
     const result = await actions.run(action, () => send('POST', paths.announcement(item.uuid, action), {}), action === 'acknowledge' ? 'Acknowledgment recorded' : 'Announcement marked as read');
     if (result) list.reload();
   }
+  async function rsvp(item, response) {
+    const result = await actions.run('rsvp', () => send('PUT', paths.announcement(item.uuid, 'rsvp'), { response }), 'Event response saved');
+    if (result) list.reload();
+  }
   return <Page permission="experience.self|experience.view|experience.ticket.manage|experience.announcement.manage" title="Employee announcements" description="Company updates and notices requiring acknowledgment." action={can('experience.announcement.manage') && <Button onClick={() => setCreate(true)}>Create announcement</Button>}>
     {list.loading ? <Skeleton /> : list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : <div className="grid gap-3">
-      {list.rows.map((item) => <Card key={item.uuid} title={<>{item.pinned && <span className="mr-2 text-amber-600">Pinned</span>}{item.title}</>} action={<StatusBadge value={item.status} />}>
+      {list.rows.map((item) => <Card key={item.uuid} title={<>{item.communication_type && item.communication_type !== 'announcement' && <span className="mr-2 text-brand-700">{item.communication_type === 'event' ? 'Event' : 'Onboarding'}</span>}{item.pinned && <span className="mr-2 text-amber-600">Pinned</span>}{item.title}</>} action={<StatusBadge value={item.status} />}>
         <p className="whitespace-pre-wrap text-sm leading-6">{item.body}</p>
+        {item.communication_type === 'event' && <p className="text-xs text-slate-500">{item.event_starts_at ? `Starts ${new Date(item.event_starts_at).toLocaleString()}` : ''}{item.event_ends_at ? ` Â· Ends ${new Date(item.event_ends_at).toLocaleString()}` : ''}{item.event_location ? ` Â· ${item.event_location}` : ''}</p>}
         <p className="text-xs text-slate-500">{item.publish_at ? `Published ${item.publish_at}` : 'Draft'}{item.expires_at ? ` · Expires ${item.expires_at}` : ''}{item.acknowledgment_required ? ' · Acknowledgment required' : ''}{item.audience && Object.values(item.audience).some((a) => a.length) ? ' · Targeted audience' : ''}</p>
         {item.status === 'published' && !item.read_at && <Button variant="secondary" disabled={Boolean(actions.busy)} onClick={() => track(item, 'read')}>Mark as read</Button>}
         {item.status === 'published' && item.acknowledgment_required && !item.acknowledged_at && <Button className="ml-2" disabled={Boolean(actions.busy)} onClick={() => track(item, 'acknowledge')}>Acknowledge</Button>}
         {item.read_at && <p className="mb-0 text-xs text-emerald-700">{item.acknowledged_at ? 'Acknowledged' : 'Read'}</p>}
+        {item.communication_type === 'event' && item.status === 'published' && <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs">{item.my_rsvp ? `Your response: ${item.my_rsvp.replace('_', ' ')}` : 'Will you attend?'}</span>{['attending', 'maybe', 'declined'].map((response) => <Button key={response} variant="secondary" disabled={Boolean(actions.busy) || item.my_rsvp === response} onClick={() => rsvp(item, response)}>{response === 'declined' ? 'Can’t attend' : response[0].toUpperCase() + response.slice(1)}</Button>)}</div>}
         {can('experience.announcement.manage') && item.status === 'draft' && <Button variant="secondary" disabled={Boolean(actions.busy)} onClick={async () => { const result = await actions.run('publish', () => send('POST', paths.announcement(item.uuid, 'publish'), {}), 'Announcement published'); if (result) list.reload(); }}>Publish</Button>}
         {can('experience.analytics.view') && item.status !== 'draft' && <Link className="ml-3 text-xs underline" to={`/experience/announcements/${item.uuid}/metrics`}>Read metrics</Link>}
       </Card>)}
       {!list.rows.length && <Card><p className="m-0 text-sm">No announcements yet.</p></Card>}
     </div>}
-    <FormModal open={create} onClose={() => setCreate(false)} title="Create announcement" intro="Save a draft, then publish it when it is ready." fields={[
+    <FormModal open={create} onClose={() => setCreate(false)} title="Create employee communication" intro="Save a draft, then publish it when it is ready. Onboarding messages are snapshotted to employees whose start date falls within the selected window." fields={[
+      { name: 'communication_type', label: 'Communication type', options: [{ value: 'announcement', label: 'Announcement' }, { value: 'event', label: 'Event invitation' }, { value: 'onboarding', label: 'Onboarding communication' }] },
       { name: 'title', label: 'Title' }, { name: 'body', label: 'Announcement', textarea: true },
+      { name: 'event_starts_at', label: 'Event start (tenant local time)', type: 'datetime-local', required: false }, { name: 'event_ends_at', label: 'Event end (tenant local time)', type: 'datetime-local', required: false }, { name: 'event_location', label: 'Event location or meeting link', required: false },
       { name: 'publish_at', label: 'Publish date', type: 'date', required: false }, { name: 'expires_at', label: 'Expiration date', type: 'date', required: false },
       { name: 'acknowledgment_required', label: 'Require employee acknowledgment', type: 'checkbox' }, { name: 'pinned', label: 'Pin announcement', type: 'checkbox' },
-    ]} initial={{ acknowledgment_required: false, pinned: false }} extra={(v, set) => <div className="mb-4"><p className="text-xs">Audience filters (leave all empty to target the whole workspace)</p>{[
+    ]} initial={{ communication_type: 'announcement', acknowledgment_required: false, pinned: false }} extra={(v, set) => <div className="mb-4">{v.communication_type === 'onboarding' && <label className="mb-4 block text-xs">Target new hires whose start date is within<input aria-label="New hire window" type="number" min="1" max="90" required value={v.new_hires_within_days ?? ''} onChange={(e) => set('new_hires_within_days', e.target.value ? Number(e.target.value) : '')} className="mx-2 min-h-10 w-24 rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900" />days of the publish date (max 90)</label>}<p className="text-xs">Audience filters (leave all empty to target the whole workspace)</p>{[
       ['legal_entity_ids', 'Legal entities', audienceOptions.data?.legal_entities ?? []], ['location_ids', 'Locations', audienceOptions.data?.locations ?? []], ['designation_ids', 'Roles / designations', audienceOptions.data?.designations ?? []],
     ].map(([key, label, options]) => <fieldset key={key} className="mb-3"><legend className="text-xs font-semibold">{label}</legend><div className="mt-1 flex flex-wrap gap-3">{options.map((option) => <label key={option.id} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={(v[key] ?? []).includes(option.id)} onChange={(e) => set(key, e.target.checked ? [...(v[key] ?? []), option.id] : (v[key] ?? []).filter((id) => id !== option.id))} />{option.name}</label>)}</div></fieldset>)}</div>}
-    onSubmit={(v) => send('POST', paths.announcements, { title: v.title, body: v.body, acknowledgment_required: Boolean(v.acknowledgment_required), pinned: Boolean(v.pinned), publish_at: v.publish_at || null, expires_at: v.expires_at || null, audience: { legal_entity_ids: v.legal_entity_ids ?? [], location_ids: v.location_ids ?? [], designation_ids: v.designation_ids ?? [] } })} success="Draft announcement created" />
+    onSubmit={(v) => send('POST', paths.announcements, { title: v.title, body: v.body, communication_type: v.communication_type || 'announcement', event_starts_at: v.event_starts_at || null, event_ends_at: v.event_ends_at || null, event_location: v.event_location || null, acknowledgment_required: Boolean(v.acknowledgment_required), pinned: Boolean(v.pinned), publish_at: v.publish_at || null, expires_at: v.expires_at || null, audience: { legal_entity_ids: v.legal_entity_ids ?? [], location_ids: v.location_ids ?? [], designation_ids: v.designation_ids ?? [], ...(v.communication_type === 'onboarding' && v.new_hires_within_days ? { new_hires_within_days: Number(v.new_hires_within_days) } : {}) } })} success="Draft communication created" />
   </Page>;
 }
 
@@ -137,53 +173,66 @@ export function AnnouncementMetricsPage() {
 export function SurveysPage() {
   const { can } = useAuth();
   const [create, setCreate] = useState(false);
+  const [addBankQuestion, setAddBankQuestion] = useState(false);
+  const [addScale, setAddScale] = useState(false);
   const [answers, setAnswers] = useState({});
   const [consents, setConsents] = useState({});
   const list = useList(`${paths.surveys}?per_page=50`);
   const audienceOptions = useList(can('experience.survey.manage') ? paths.surveyAudienceOptions : null);
+  const bankQuestions = useList(can('experience.survey.manage') ? paths.surveyBankQuestions : null);
+  const scales = useList(can('experience.survey.manage') ? paths.surveyScales : null);
   const actions = useDo();
   async function submit(survey) {
     const result = await actions.run(survey.uuid, () => send('POST', paths.survey(survey.uuid, 'responses'), { answers: answers[survey.uuid] ?? {}, consent: Boolean(consents[survey.uuid]) }), 'Anonymous response submitted');
     if (result) { setAnswers((all) => ({ ...all, [survey.uuid]: {} })); list.reload(); }
   }
   return <Page permission="experience.self|experience.view|experience.ticket.manage|experience.survey.manage" title="Employee surveys" description="Share feedback through anonymous rating surveys. Individual answers are never shown.
-    Results stay hidden until the response threshold is reached." action={can('experience.survey.manage') && <Button onClick={() => setCreate(true)}>Create survey</Button>}>
+    Results stay hidden until the response threshold is reached." action={can('experience.survey.manage') && <div className="flex gap-2"><Button variant="secondary" onClick={() => setAddBankQuestion(true)}>Add question to bank</Button><Button variant="secondary" onClick={() => setAddScale(true)}>Add rating scale</Button><Button onClick={() => setCreate(true)}>Create survey</Button></div>}>
+    {can('experience.survey.manage') && <Card className="mb-4" title="Reusable survey library"><p className="mb-2 text-xs text-slate-500">{bankQuestions.rows.length} active prompts · {scales.rows.length} active rating scales. Prompts and scales are copied into each survey draft so later library changes do not alter a live campaign.</p><div className="flex flex-wrap gap-2">{scales.rows.map((scale) => <span key={scale.code} className="rounded-full bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">{scale.name} ({scale.minimum_value}–{scale.maximum_value})</span>)}</div></Card>}
     {list.loading ? <Skeleton /> : list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : <div className="grid gap-3">
       {list.rows.map((survey) => <Card key={survey.uuid} title={survey.title} action={<StatusBadge value={survey.status} />}>
         <p className="text-xs text-slate-500">{survey.campaign_type} campaign{survey.retention_until ? ` · Responses retained until ${survey.retention_until}` : ''}</p>
         {survey.description && <p className="text-sm">{survey.description}</p>}
         {survey.status === 'published' && !survey.submitted && <form onSubmit={(e) => { e.preventDefault(); submit(survey); }} className="space-y-4">
-          <p className="text-xs text-slate-500">Anonymous survey · results are suppressed until at least five people respond. We store completion separately to prevent duplicate submissions.</p>
-          {survey.questions.map((question) => <label key={question.uuid} className="block text-sm">{question.prompt}<select required aria-label={question.prompt} className="mt-1 block min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" value={answers[survey.uuid]?.[question.uuid] ?? ''} onChange={(e) => setAnswers((all) => ({ ...all, [survey.uuid]: { ...all[survey.uuid], [question.uuid]: Number(e.target.value) } }))}><option value="">Choose a rating</option>{question.scale.map((n) => <option key={n} value={n}>{n}</option>)}</select></label>)}
-          {survey.requires_consent && <label className="flex items-start gap-2 text-xs"><input type="checkbox" required checked={Boolean(consents[survey.uuid])} onChange={(e) => setConsents((all) => ({ ...all, [survey.uuid]: e.target.checked }))} />I consent to submit an anonymous rating response for this survey.</label>}
-          <Button type="submit" disabled={Boolean(actions.busy)}>Submit anonymous response</Button>
+          <p className="text-xs text-slate-500">{survey.response_mode === 'identified' ? 'Identified response · specially authorized administrators can view your name and answers; access is audited.' : survey.response_mode === 'confidential' ? 'Confidential response · encrypted answers are separated from your completion record; managers see thresholded aggregates only.' : 'Anonymous response · answers are stored only as aggregate counts.'} Results stay suppressed until at least five people respond.</p>
+          {survey.questions.map((question) => <label key={question.uuid} className="block text-sm">{question.prompt}<select required aria-label={question.prompt} className="mt-1 block min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" value={answers[survey.uuid]?.[question.uuid] ?? ''} onChange={(e) => setAnswers((all) => ({ ...all, [survey.uuid]: { ...all[survey.uuid], [question.uuid]: Number(e.target.value) } }))}><option value="">Choose a rating</option>{question.scale.map((n) => <option key={n} value={n}>{question.scale_labels?.[n] ? `${n} · ${question.scale_labels[n]}` : n}</option>)}</select></label>)}
+          {survey.requires_consent && <label className="flex items-start gap-2 text-xs"><input type="checkbox" required checked={Boolean(consents[survey.uuid])} onChange={(e) => setConsents((all) => ({ ...all, [survey.uuid]: e.target.checked }))} />{survey.response_mode === 'identified' ? 'I understand my name and ratings will be available to specifically authorized administrators.' : survey.response_mode === 'confidential' ? 'I consent to encrypted confidential answers that are not linked to my completion record.' : 'I consent to submit an anonymous rating response for this survey.'}</label>}
+          <Button type="submit" disabled={Boolean(actions.busy)}>Submit {survey.response_mode === 'identified' ? 'identified' : survey.response_mode === 'confidential' ? 'confidential' : 'anonymous'} response</Button>
         </form>}
-      {survey.submitted && <p className="mb-0 text-sm text-emerald-700">Your anonymous response has been recorded.</p>}
+      {survey.submitted && <p className="mb-0 text-sm text-emerald-700">Your {survey.response_mode === 'identified' ? 'identified' : survey.response_mode === 'confidential' ? 'confidential' : 'anonymous'} response has been recorded.</p>}
         {can('experience.survey.manage') && survey.status === 'draft' && <Button variant="secondary" onClick={async () => { const result = await actions.run('publish', () => send('POST', paths.survey(survey.uuid, 'publish'), {}), 'Survey published'); if (result) list.reload(); }}>Publish</Button>}
         {can('experience.survey.manage') && survey.status === 'published' && <p className="mb-0 mt-3 text-xs"><Link to={`/experience/surveys/${survey.uuid}/results`} className="underline">View thresholded results</Link></p>}
       </Card>)}
       {!list.rows.length && <Card><p className="m-0 text-sm">No surveys are available.</p></Card>}
     </div>}
-    <FormModal open={create} onClose={() => setCreate(false)} title="Create anonymous survey" intro="Only 1–5 rating questions are supported in this privacy-focused survey slice. Add one prompt per line." fields={[
+    <FormModal open={create} onClose={() => setCreate(false)} title="Create anonymous survey" intro="Ratings use tenant-managed scales. Add prompts from the reusable bank, write new prompts, or combine both." fields={[
       { name: 'campaign_type', label: 'Campaign type', options: ['engagement', 'pulse', 'onboarding', 'exit', 'custom'].map((value) => ({ value, label: value })) },
+      { name: 'response_mode', label: 'Response privacy mode', options: [{ value: 'anonymous', label: 'Anonymous (aggregate counts only)' }, { value: 'confidential', label: 'Confidential (encrypted, identity separated)' }, { value: 'identified', label: 'Identified (restricted access to named responses)' }] },
       { name: 'title', label: 'Title' }, { name: 'description', label: 'Description', textarea: true, required: false },
       { name: 'opens_at', label: 'Open date', type: 'date', required: false }, { name: 'closes_at', label: 'Close date', type: 'date', required: false }, { name: 'retention_until', label: 'Retention end date', type: 'date' },
       { name: 'minimum_responses', label: 'Minimum responses before results appear', type: 'number', initial: 5 },
-      { name: 'requires_consent', label: 'Require explicit consent before response', type: 'checkbox' },
-      { name: 'questions_text', label: 'Rating questions', textarea: true },
-    ]} initial={{ campaign_type: 'custom', minimum_responses: 5, requires_consent: false }} extra={(v, set) => <div className="mb-4"><p className="text-xs">Eligibility filters (leave all empty to include all employees)</p>{[
+      { name: 'scale_code', label: 'Default rating scale', options: scales.rows.map((scale) => ({ value: scale.code, label: `${scale.name} (${scale.minimum_value}–${scale.maximum_value})` })) },
+      { name: 'requires_consent', label: 'Require explicit consent (mandatory for confidential or identified modes)', type: 'checkbox' },
+      { name: 'reminder_interval_days', label: 'Reminder interval in days (optional)', type: 'number', required: false },
+      { name: 'max_reminders', label: 'Maximum reminders (0 to disable)', type: 'number', initial: 0 },
+      { name: 'questions_text', label: 'Additional rating prompts (one per line)', textarea: true, required: false },
+    ]} initial={{ campaign_type: 'custom', response_mode: 'anonymous', minimum_responses: 5, requires_consent: false, max_reminders: 0, scale_code: 'FIVE' }} extra={(v, set) => <div className="mb-4">{v.response_mode !== 'anonymous' && <p className="rounded bg-amber-50 p-3 text-xs text-amber-900">Consent is mandatory for this mode. Confidential answers are encrypted and unlinked from participants; identified answers are encrypted but linked and visible only to users granted the separate audited permission.</p>}{bankQuestions.rows.length > 0 && <fieldset className="mb-4"><legend className="text-xs font-semibold">Question bank (optional)</legend><div className="mt-1 grid gap-2">{bankQuestions.rows.map((question) => <label key={question.uuid} className="flex items-start gap-2 text-xs"><input type="checkbox" checked={(v.bank_question_uuids ?? []).includes(question.uuid)} onChange={(e) => set('bank_question_uuids', e.target.checked ? [...(v.bank_question_uuids ?? []), question.uuid] : (v.bank_question_uuids ?? []).filter((id) => id !== question.uuid))} /><span>{question.prompt}{question.category ? ` · ${question.category}` : ''}</span></label>)}</div></fieldset>}<p className="text-xs">Eligibility filters (leave all empty to include all employees)</p>{[
       ['legal_entity_ids', 'Legal entities', audienceOptions.data?.legal_entities ?? []], ['location_ids', 'Locations', audienceOptions.data?.locations ?? []], ['designation_ids', 'Roles / designations', audienceOptions.data?.designations ?? []],
     ].map(([key, label, options]) => <fieldset key={key} className="mb-3"><legend className="text-xs font-semibold">{label}</legend><div className="mt-1 flex flex-wrap gap-3">{options.map((option) => <label key={option.id} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={(v[key] ?? []).includes(option.id)} onChange={(e) => set(key, e.target.checked ? [...(v[key] ?? []), option.id] : (v[key] ?? []).filter((id) => id !== option.id))} />{option.name}</label>)}</div></fieldset>)}</div>}
-      onSubmit={(v) => send('POST', paths.surveys, { title: v.title, campaign_type: v.campaign_type || 'custom', description: v.description || null, opens_at: v.opens_at || null, closes_at: v.closes_at || null, retention_until: v.retention_until, requires_consent: Boolean(v.requires_consent), minimum_responses: Number(v.minimum_responses || 5), eligibility: { legal_entity_ids: v.legal_entity_ids ?? [], location_ids: v.location_ids ?? [], designation_ids: v.designation_ids ?? [] }, questions: v.questions_text.split('\n').map((prompt) => prompt.trim()).filter(Boolean).map((prompt) => ({ prompt })) })} success="Survey draft created" />
+      onSubmit={(v) => send('POST', paths.surveys, { title: v.title, campaign_type: v.campaign_type || 'custom', response_mode: v.response_mode || 'anonymous', description: v.description || null, opens_at: v.opens_at || null, closes_at: v.closes_at || null, retention_until: v.retention_until, requires_consent: Boolean(v.requires_consent || v.response_mode !== 'anonymous'), reminder_interval_days: Number(v.reminder_interval_days || 0) || null, max_reminders: Number(v.max_reminders || 0), minimum_responses: Number(v.minimum_responses || 5), scale_code: v.scale_code || 'FIVE', eligibility: { legal_entity_ids: v.legal_entity_ids ?? [], location_ids: v.location_ids ?? [], designation_ids: v.designation_ids ?? [] }, questions: [...(v.bank_question_uuids ?? []).map((bank_question_uuid) => ({ bank_question_uuid })), ...(v.questions_text || '').split('\n').map((prompt) => prompt.trim()).filter(Boolean).map((prompt) => ({ prompt }))] })} success="Survey draft created" />
+    <FormModal open={addBankQuestion} onClose={() => setAddBankQuestion(false)} title="Add reusable survey prompt" fields={[{ name: 'prompt', label: 'Question prompt' }, { name: 'category', label: 'Category', required: false }]} onSubmit={(v) => send('POST', paths.surveyBankQuestions, v)} success="Question added to bank" />
+    <FormModal open={addScale} onClose={() => setAddScale(false)} title="Add rating scale" intro="Enter one optional label per value, in order from the minimum to the maximum." fields={[{ name: 'code', label: 'Scale code' }, { name: 'name', label: 'Scale name' }, { name: 'minimum_value', label: 'Minimum value', type: 'number' }, { name: 'maximum_value', label: 'Maximum value', type: 'number' }, { name: 'labels_text', label: 'Value labels (one per line)', textarea: true, required: false }]} initial={{ minimum_value: 1, maximum_value: 5 }} onSubmit={(v) => send('POST', paths.surveyScales, { code: v.code, name: v.name, minimum_value: Number(v.minimum_value), maximum_value: Number(v.maximum_value), labels: (v.labels_text || '').split('\n').map((label) => label.trim()).filter(Boolean) })} success="Rating scale created" />
   </Page>;
 }
 
 export function SurveyResultsPage() {
   const { uuid } = useParams();
+  const { can } = useAuth();
   const result = useList(paths.survey(uuid, 'results'));
+  const identified = useList(can('experience.survey.identifiable.view') ? paths.survey(uuid, 'identified-responses') : null);
   const data = result.data?.data ?? result.data;
-  return <Page permission="experience.survey.manage" title="Survey results" description="Only aggregates meeting the privacy threshold are shown.">
-    {result.loading ? <Skeleton /> : result.error ? <ErrorState error={result.error} onRetry={result.reload} /> : data && (data.retention_expired ? <Card><p className="m-0 text-sm">Survey response data has been purged after its retention period.</p></Card> : data.suppressed ? <Card><p className="m-0 text-sm">Results are hidden until at least {data.minimum_responses} people have responded.</p></Card> : <div className="grid gap-3"><Card><p className="m-0 text-sm">{data.response_count} responses · minimum threshold {data.minimum_responses}</p></Card>{data.questions.map((question) => <Card key={question.uuid} title={question.prompt}><ul className="m-0 space-y-1 p-0 text-sm">{question.distribution.map((row) => <li key={row.rating}>Rating {row.rating}: {row.suppressed ? 'Suppressed' : row.count}</li>)}</ul></Card>)}</div>)}
+  return <Page permission="experience.survey.manage" title="Survey results" description="Only aggregates meeting the privacy threshold are shown." action={data && !data.suppressed && !data.retention_expired && <Button variant="secondary" onClick={() => download(paths.surveyExport(uuid), `survey-aggregates-${uuid}.csv`)}>Download secure aggregate CSV</Button>}>
+    {result.loading ? <Skeleton /> : result.error ? <ErrorState error={result.error} onRetry={result.reload} /> : data && (data.retention_expired ? <Card><p className="m-0 text-sm">Survey response data has been purged after its retention period.</p></Card> : data.suppressed ? <Card><p className="m-0 text-sm">Results are hidden until at least {data.minimum_responses} people have responded.</p></Card> : <div className="grid gap-3"><Card><p className="m-0 text-sm">{data.response_count} responses · minimum threshold {data.minimum_responses} · {data.response_mode} mode</p></Card>{data.questions.map((question) => <Card key={question.uuid} title={question.prompt}><ul className="m-0 space-y-1 p-0 text-sm">{question.distribution.map((row) => <li key={row.rating}>Rating {row.rating}{row.label ? ` · ${row.label}` : ''}: {row.suppressed ? 'Suppressed' : row.count}</li>)}</ul></Card>)}{can('experience.survey.identifiable.view') && data.response_mode === 'identified' && <Card title="Identified submissions"><p className="text-xs text-slate-500">Access is audited. No response timestamps are stored.</p>{identified.loading ? <Skeleton /> : identified.error ? <ErrorState error={identified.error} onRetry={identified.reload} /> : identified.data?.suppressed ? <p className="text-sm">Individual responses stay hidden until the minimum threshold is reached.</p> : <div className="space-y-3">{(identified.data?.responses ?? []).map((response, i) => <article key={`${response.employee}-${i}`} className="border-t border-slate-200 pt-3 dark:border-slate-700"><p className="m-0 text-sm font-semibold">{response.employee}</p><ul className="mb-0 mt-2 space-y-1 pl-5 text-xs">{response.answers.map((answer) => <li key={answer.prompt}>{answer.prompt}: {answer.value}{answer.label ? ` · ${answer.label}` : ''}</li>)}</ul></article>)}</div>}</Card>}</div>)}
   </Page>;
 }
 

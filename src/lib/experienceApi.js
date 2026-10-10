@@ -13,7 +13,11 @@ export const experiencePaths = {
   announcement: (uuid, part = '') => `${E}/announcements/${uuid}${part ? `/${part}` : ''}`,
   surveys: `${E}/surveys`,
   surveyAudienceOptions: `${E}/surveys/audience-options`,
+  surveyBankQuestions: `${E}/survey-catalog/questions`,
+  surveyScales: `${E}/survey-catalog/scales`,
+  communicationPreferences: `${E}/communication-preferences`,
   survey: (uuid, part = '') => `${E}/surveys/${uuid}${part ? `/${part}` : ''}`,
+  surveyExport: (uuid) => `${E}/surveys/${uuid}/export`,
   recognitions: `${E}/recognitions`,
   recognition: (uuid, part = '') => `${E}/recognitions/${uuid}${part ? `/${part}` : ''}`,
 };
