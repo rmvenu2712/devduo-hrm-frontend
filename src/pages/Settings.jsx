@@ -191,12 +191,15 @@ function SettingsForm({ data }) {
           {tab === 'modules' && (
             <>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Enable the foundation modules your company needs. Disabled modules are hidden and
+                Enable the modules your company needs. Disabled modules are hidden and
                 blocked in the API.
               </p>
               {[
                 ['work', 'My Work'],
                 ['notifications', 'Notification center'],
+                ['people', 'People'], ['attendance', 'Attendance'], ['leave', 'Leave'], ['payroll', 'Payroll'],
+                ['recruitment', 'Recruitment'], ['lifecycle', 'Lifecycle'], ['performance', 'Performance'],
+                ['learning', 'Learning'], ['experience', 'Employee experience'], ['assets', 'Assets'], ['expenses', 'Expenses'], ['travel', 'Travel'],
               ].map(([value, label]) => (
                 <div
                   className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 py-4"
@@ -214,11 +217,11 @@ function SettingsForm({ data }) {
                       )
                     }
                   />
-                  <Badge tone="green">Foundation</Badge>
+                  <Badge tone={form.settings.modules.includes(value) ? 'green' : 'neutral'}>{form.settings.modules.includes(value) ? 'Enabled' : 'Disabled'}</Badge>
                 </div>
               ))}
               <div className="my-5 rounded-lg border border-brand-100 dark:border-brand-900 bg-brand-50 dark:bg-brand-950 p-4 text-xs leading-7 text-brand-800 dark:text-brand-200">
-                Payroll, recruitment, performance, and other advanced modules are outside Phase 1.
+                Module access also depends on each user's role and employee data scope.
               </div>
             </>
           )}

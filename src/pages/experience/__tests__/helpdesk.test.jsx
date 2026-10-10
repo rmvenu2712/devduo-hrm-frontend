@@ -123,6 +123,21 @@ describe('HR helpdesk', () => {
     expect(calls(api, '/announcements/notice1/acknowledge')).toHaveLength(1);
   });
 
+  it('lets announcement managers upload a private file to a draft', async () => {
+    permissions = ['experience.announcement.manage'];
+    mockApi(api, {
+      '/announcements/a1/attachments': { uuid: 'file1', filename: 'guide.pdf', size_bytes: 12 },
+      '/announcements': { data: [{ uuid: 'a1', title: 'Employee guide', body: 'Read the guide.', status: 'draft', attachments: [] }] },
+    });
+    render(wrap(<AnnouncementsPage />));
+    const file = new File(['guide'], 'guide.pdf', { type: 'application/pdf' });
+    fireEvent.change(await screen.findByLabelText('Attachment for Employee guide'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload attachment' }));
+    expect(await screen.findByText('Attachment uploaded')).toBeInTheDocument();
+    expect(calls(api, '/announcements/a1/attachments')).toHaveLength(1);
+    expect(calls(api, '/announcements/a1/attachments')[0][1].body).toBeInstanceOf(FormData);
+  });
+
   it('lets employees RSVP to an event campaign', async () => {
     permissions = ['experience.self'];
     mockApi(api, {

@@ -49,6 +49,7 @@ export function CommunicationPreferencesPage() {
 export function TicketListPage() {
   const { can } = useAuth();
   const [create, setCreate] = useState(false);
+  const [createCategory, setCreateCategory] = useState(false);
   const [queue, setQueue] = useState({ status: '', priority: '', assignee: '', sla_overdue: false });
   const categories = useList(paths.categories);
   const assignees = useList(can('experience.ticket.manage') ? paths.ticketAssignees : null);
@@ -60,7 +61,7 @@ export function TicketListPage() {
   const fields = [{ name: 'category_uuid', label: 'Request type', options: categories.rows.map((c) => ({ value: c.uuid, label: c.name })) },
     { name: 'subject', label: 'Subject' }, { name: 'description', label: 'Describe what you need', textarea: true }];
   return <Page permission="experience.self|experience.view|experience.ticket.manage" title={employee && !can('experience.view') ? 'My HR requests' : 'HR service desk'} description={employee && !can('experience.view') ? 'Create a request and follow updates from HR.' : 'Review service requests visible within your access scope.'} action={employee && <Button onClick={() => setCreate(true)}>New request</Button>}>
-    {can('experience.ticket.manage') && <Card className="mb-4" title="Service queue"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {can('experience.ticket.manage') && <Card className="mb-4" title="Service queue" action={can('experience.category.manage') && <Button variant="secondary" onClick={() => setCreateCategory(true)}>Add routed category</Button>}><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="text-xs">Status<select aria-label="Queue status" className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={queue.status} onChange={(e) => setQueue((q) => ({ ...q, status: e.target.value }))}><option value="">All statuses</option>{['open', 'in_progress', 'waiting_employee', 'resolved', 'closed'].map((x) => <option key={x} value={x}>{x.replace('_', ' ')}</option>)}</select></label>
       <label className="text-xs">Priority<select aria-label="Queue priority" className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={queue.priority} onChange={(e) => setQueue((q) => ({ ...q, priority: e.target.value }))}><option value="">All priorities</option>{['low', 'normal', 'high', 'urgent'].map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
       <label className="text-xs">Assignment<select aria-label="Queue assignment" className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={queue.assignee} onChange={(e) => setQueue((q) => ({ ...q, assignee: e.target.value }))}><option value="">All assignments</option><option value="unassigned">Unassigned</option>{assignees.rows.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
@@ -74,6 +75,10 @@ export function TicketListPage() {
       {!list.rows.length && <Card><p className="m-0 text-sm">No requests found.</p></Card>}
     </div>}
     <FormModal open={create} onClose={() => setCreate(false)} title="New HR request" intro="Only HR service staff can see internal notes added during handling." fields={fields} extra={(values) => <ArticleSuggestions values={values} />} onSubmit={(data) => send('POST', paths.tickets, data)} success="Request submitted" />
+    <FormModal open={createCategory} onClose={() => setCreateCategory(false)} title="Add service category" intro="New requests in this category go to the selected active HR service owner and inherit its SLA target." fields={[
+      { name: 'code', label: 'Category code' }, { name: 'name', label: 'Category name' }, { name: 'target_hours', label: 'SLA target (hours)', type: 'number', required: false },
+      { name: 'default_assignee_id', label: 'Default HR owner', options: [{ value: '', label: 'Leave unassigned' }, ...assignees.rows.map((user) => ({ value: user.id, label: user.name }))], required: false },
+    ]} onSubmit={(data) => send('POST', paths.categories, { ...data, target_hours: data.target_hours ? Number(data.target_hours) : null, default_assignee_id: data.default_assignee_id ? Number(data.default_assignee_id) : null })} success="Service category created" />
   </Page>;
 }
 
@@ -122,6 +127,7 @@ export function KnowledgeArticlePage() {
 export function AnnouncementsPage() {
   const { can } = useAuth();
   const [create, setCreate] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState({});
   const list = useList(`${paths.announcements}?per_page=50`);
   const audienceOptions = useList(can('experience.announcement.manage') ? paths.announcementAudienceOptions : null);
   const actions = useDo();
@@ -133,17 +139,25 @@ export function AnnouncementsPage() {
     const result = await actions.run('rsvp', () => send('PUT', paths.announcement(item.uuid, 'rsvp'), { response }), 'Event response saved');
     if (result) list.reload();
   }
+  async function attach(item) {
+    const file = attachmentFiles[item.uuid];
+    if (!file) return;
+    const form = new FormData(); form.append('file', file);
+    const result = await actions.run(`attachment-${item.uuid}`, () => send('POST', paths.announcement(item.uuid, 'attachments'), form), 'Attachment uploaded');
+    if (result) { setAttachmentFiles((current) => ({ ...current, [item.uuid]: null })); list.reload(); }
+  }
   return <Page permission="experience.self|experience.view|experience.ticket.manage|experience.announcement.manage" title="Employee announcements" description="Company updates and notices requiring acknowledgment." action={can('experience.announcement.manage') && <Button onClick={() => setCreate(true)}>Create announcement</Button>}>
     {list.loading ? <Skeleton /> : list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : <div className="grid gap-3">
       {list.rows.map((item) => <Card key={item.uuid} title={<>{item.communication_type && item.communication_type !== 'announcement' && <span className="mr-2 text-brand-700">{item.communication_type === 'event' ? 'Event' : 'Onboarding'}</span>}{item.pinned && <span className="mr-2 text-amber-600">Pinned</span>}{item.title}</>} action={<StatusBadge value={item.status} />}>
         <p className="whitespace-pre-wrap text-sm leading-6">{item.body}</p>
+        {!!item.attachments?.length && <ul className="my-2 space-y-1 text-xs">{item.attachments.map((file) => <li key={file.uuid}><button type="button" className="text-brand-700 underline" onClick={() => download(paths.announcement(item.uuid, `attachments/${file.uuid}`), file.filename)}>{file.filename}</button><span className="ml-2 text-slate-500">{Math.ceil(file.size_bytes / 1024)} KB</span></li>)}</ul>}
         {item.communication_type === 'event' && <p className="text-xs text-slate-500">{item.event_starts_at ? `Starts ${new Date(item.event_starts_at).toLocaleString()}` : ''}{item.event_ends_at ? ` Â· Ends ${new Date(item.event_ends_at).toLocaleString()}` : ''}{item.event_location ? ` Â· ${item.event_location}` : ''}</p>}
         <p className="text-xs text-slate-500">{item.publish_at ? `Published ${item.publish_at}` : 'Draft'}{item.expires_at ? ` · Expires ${item.expires_at}` : ''}{item.acknowledgment_required ? ' · Acknowledgment required' : ''}{item.audience && Object.values(item.audience).some((a) => a.length) ? ' · Targeted audience' : ''}</p>
         {item.status === 'published' && !item.read_at && <Button variant="secondary" disabled={Boolean(actions.busy)} onClick={() => track(item, 'read')}>Mark as read</Button>}
         {item.status === 'published' && item.acknowledgment_required && !item.acknowledged_at && <Button className="ml-2" disabled={Boolean(actions.busy)} onClick={() => track(item, 'acknowledge')}>Acknowledge</Button>}
         {item.read_at && <p className="mb-0 text-xs text-emerald-700">{item.acknowledged_at ? 'Acknowledged' : 'Read'}</p>}
         {item.communication_type === 'event' && item.status === 'published' && <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs">{item.my_rsvp ? `Your response: ${item.my_rsvp.replace('_', ' ')}` : 'Will you attend?'}</span>{['attending', 'maybe', 'declined'].map((response) => <Button key={response} variant="secondary" disabled={Boolean(actions.busy) || item.my_rsvp === response} onClick={() => rsvp(item, response)}>{response === 'declined' ? 'Can’t attend' : response[0].toUpperCase() + response.slice(1)}</Button>)}</div>}
-        {can('experience.announcement.manage') && item.status === 'draft' && <Button variant="secondary" disabled={Boolean(actions.busy)} onClick={async () => { const result = await actions.run('publish', () => send('POST', paths.announcement(item.uuid, 'publish'), {}), 'Announcement published'); if (result) list.reload(); }}>Publish</Button>}
+        {can('experience.announcement.manage') && item.status === 'draft' && <><label className="mr-2 block text-xs">Attachments (PDF, image, Word, or Excel; 5 MB each, up to 5)<input aria-label={`Attachment for ${item.title}`} type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xlsx" onChange={(e) => setAttachmentFiles((current) => ({ ...current, [item.uuid]: e.target.files?.[0] ?? null }))} className="mt-1 block text-sm" /></label><Button className="mr-2" variant="secondary" disabled={!attachmentFiles[item.uuid] || Boolean(actions.busy)} onClick={() => attach(item)}>Upload attachment</Button><Button variant="secondary" disabled={Boolean(actions.busy)} onClick={async () => { const result = await actions.run('publish', () => send('POST', paths.announcement(item.uuid, 'publish'), {}), 'Announcement published'); if (result) list.reload(); }}>Publish</Button></>}
         {can('experience.analytics.view') && item.status !== 'draft' && <Link className="ml-3 text-xs underline" to={`/experience/announcements/${item.uuid}/metrics`}>Read metrics</Link>}
       </Card>)}
       {!list.rows.length && <Card><p className="m-0 text-sm">No announcements yet.</p></Card>}
