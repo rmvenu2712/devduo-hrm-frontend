@@ -33,4 +33,10 @@ export const lifecycleRoutes = (
   </Route>
 );
 
-export const lifecycleNavItem = { to: '/lifecycle', label: 'Lifecycle', icon: UserCheck, permission: LIFECYCLE_ACCESS, module: 'lifecycle' };
+export const lifecycleNavItem = {
+  to: '/lifecycle',
+  label: 'Lifecycle',
+  icon: UserCheck,
+  permission: LIFECYCLE_ACCESS,
+  module: 'lifecycle',
+};

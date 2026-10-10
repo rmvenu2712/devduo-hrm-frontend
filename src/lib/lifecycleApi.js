@@ -2,9 +2,9 @@ import { query } from './api';
 
 /**
  * Lifecycle API helpers (docs/api/lifecycle-onboarding.md). Paths are relative to `/api`.
- * Assumed shapes: lists are Laravel paginators; case = {uuid, kind, status, employee_name, anchor_date, readiness};
- * task = {uuid, title, group_name, owner_name, owner_type, due_date, status, mandatory, requires_document, overdue, case_uuid};
- * template = {uuid, kind, name, versions:[{uuid, version, status}]}; move = {uuid, employee_name, kind, status, effective_date, can_decide, impact}.
+ * Shapes: case lists are Laravel paginators with nested employee and readiness data; preboarders expose
+ * {employee_uuid, name, joining_date, case}; task = {uuid, title, group_name, owner_name, owner_type, due_date, status, mandatory, requires_document, overdue, case_uuid};
+ * template = {uuid, kind, name, versions:[{uuid, version, status}]}; moves include nested employee data plus employee_name and can_decide.
  */
 export { listOf, pageOf, send, today, unwrap, useAction, useList } from './timeOfficeApi';
 export { query };
@@ -41,8 +41,15 @@ export const NAV = [
   { to: '/lifecycle/cases', label: 'Cases', permission: 'lifecycle.view' },
   { to: '/lifecycle/preboarders', label: 'Pre-joiners', permission: 'lifecycle.view' },
   { to: '/lifecycle/templates', label: 'Templates', permission: 'lifecycle.templates.manage' },
-  { to: '/lifecycle/moves', label: 'Internal moves', permission: 'lifecycle.moves.manage|lifecycle.moves.approve' },
+  {
+    to: '/lifecycle/moves',
+    label: 'Internal moves',
+    permission: 'lifecycle.moves.manage|lifecycle.moves.approve',
+  },
   { to: '/lifecycle/alumni', label: 'Alumni', permission: 'lifecycle.alumni.manage' },
 ];
 export const LIFECYCLE_ACCESS = [...new Set(NAV.flatMap((n) => n.permission.split('|')))].join('|');
-export const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+export const clean = (o) =>
+  Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== '' && v !== null && v !== undefined),
+  );

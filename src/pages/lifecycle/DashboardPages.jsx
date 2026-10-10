@@ -35,11 +35,14 @@ export function DashboardPage() {
         <>
           <Tiles
             items={[
-              { label: 'Open cases', value: count(d.open_cases) },
+              {
+                label: 'Open cases',
+                value: d.open_cases ?? ((d.open_onboarding ?? 0) + (d.open_offboarding ?? 0)),
+              },
               {
                 label: 'Overdue tasks',
-                value: count(d.overdue_tasks),
-                tone: count(d.overdue_tasks) ? 'warn' : undefined,
+                value: d.tasks_overdue ?? count(d.overdue_tasks),
+                tone: (d.tasks_overdue ?? count(d.overdue_tasks)) ? 'warn' : undefined,
               },
               { label: 'Joining soon', value: count(d.joining_soon) },
               {
@@ -98,10 +101,10 @@ export function DashboardPage() {
 
 export function PreboardersPage() {
   const list = useList(paths.preboarders);
-  const ready = (r) => r.readiness?.day_one_ready ?? r.day_one_ready;
-  const pct = (r) => `${r.readiness?.percent ?? r.percent ?? 0}%`;
+  const ready = (r) => r.case?.readiness?.day_one_ready ?? r.readiness?.day_one_ready ?? r.day_one_ready;
+  const pct = (r) => `${r.case?.readiness?.percent ?? r.readiness?.percent ?? r.percent ?? 0}%`;
   const blockers = (r) =>
-    (r.readiness?.blockers ?? r.blockers ?? [])
+    (r.case?.readiness?.blockers ?? r.readiness?.blockers ?? r.blockers ?? [])
       .map((b) => (typeof b === 'string' ? b : (b.title ?? b.message)))
       .join('; ');
   return (
@@ -114,12 +117,12 @@ export function PreboardersPage() {
         title="Pre-joiners"
         list={list}
         columns={[
-          { key: 'employee_name', label: 'Name' },
+          { key: 'name', label: 'Name', render: (r) => r.employee_name ?? r.name ?? r.case?.employee?.name ?? '—' },
           {
             key: 'start_date',
             label: 'Starts',
             priority: 'md',
-            render: (r) => r.start_date ?? r.anchor_date ?? '—',
+            render: (r) => r.joining_date ?? r.start_date ?? r.anchor_date ?? '—',
           },
           { key: 'percent', label: 'Checklist', priority: 'md', render: pct },
           {
@@ -132,10 +135,10 @@ export function PreboardersPage() {
             key: 'open',
             label: '',
             render: (r) =>
-              (r.case_uuid ?? r.uuid) ? (
+              (r.case?.uuid ?? r.case_uuid) ? (
                 <Link
                   className="text-brand-700 dark:text-brand-300"
-                  to={`/lifecycle/cases/${r.case_uuid ?? r.uuid}`}
+                  to={`/lifecycle/cases/${r.case?.uuid ?? r.case_uuid}`}
                 >
                   Open
                 </Link>
@@ -143,7 +146,7 @@ export function PreboardersPage() {
           },
         ]}
         mobile={{
-          title: 'employee_name',
+          title: (r) => r.employee_name ?? r.name ?? r.case?.employee?.name ?? '—',
           badge: (r) => <StatusBadge value={ready(r) ? 'ready' : 'blocked'} />,
           facts: [{ label: 'Checklist', value: pct }],
         }}

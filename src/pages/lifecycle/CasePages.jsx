@@ -26,6 +26,7 @@ const KIND = [
   { value: 'onboarding', label: 'Onboarding' },
   { value: 'offboarding', label: 'Offboarding' },
 ];
+const employeeName = (row) => row.employee_name ?? row.employee?.name ?? row.uuid;
 const OWNERS = ['manager', 'hr', 'it', 'finance', 'employee', 'user'].map((o) => ({
   value: o,
   label: titleCase(o),
@@ -90,7 +91,7 @@ export function CasesPage() {
                 className="text-brand-700 dark:text-brand-300"
                 to={`/lifecycle/cases/${c.uuid}`}
               >
-                {c.employee_name ?? c.uuid}
+                {employeeName(c)}
               </Link>
             ),
           },
@@ -106,7 +107,7 @@ export function CasesPage() {
                 className="text-sm font-semibold text-brand-700 dark:text-brand-300"
                 to={`/lifecycle/cases/${c.uuid}`}
               >
-                {c.employee_name ?? c.uuid}
+                {employeeName(c)}
               </Link>
               <StatusBadge value={c.status} />
             </div>
@@ -248,7 +249,7 @@ export function CaseDetailPage() {
   return (
     <Page
       permission="lifecycle.view"
-      title={c ? `${titleCase(c.kind)}: ${c.employee_name ?? ''}` : 'Case'}
+      title={c ? `${titleCase(c.kind)}: ${c.employee_name ?? c.employee?.name ?? ''}` : 'Case'}
       description="Tasks, owners and due dates."
       action={
         c &&

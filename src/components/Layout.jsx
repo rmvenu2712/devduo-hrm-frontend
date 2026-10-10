@@ -36,6 +36,8 @@ import { LEAVE_HR_ACCESS } from '../routes/leaveHrRoutes';
 import { payrollNavItem } from '../routes/payrollRoutes';
 import { recruitmentNavItem } from '../routes/recruitmentRoutes';
 import { lifecycleNavItem } from '../routes/lifecycleRoutes';
+import { performanceNavItem } from '../routes/performanceRoutes';
+import { learningNavItem } from '../routes/learningRoutes';
 import { Avatar, Badge, Button, Dropdown, Drawer, Breadcrumb, useToast } from './ui';
 export const organizationTypes = {
   'legal-entities': 'Legal entities',
@@ -92,6 +94,8 @@ export default function Layout() {
     payrollNavItem,
     recruitmentNavItem,
     lifecycleNavItem,
+    performanceNavItem,
+    learningNavItem,
   ];
   const admin = [
     { to: '/users', label: 'People & access', icon: Users, permission: 'users.view' },
