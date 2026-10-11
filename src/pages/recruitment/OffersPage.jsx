@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Pagination, useToast } from '../../components/ui';
 import { EmployeePicker } from '../../components/people/lookups';
 import { Banner, ConfirmDialog, FormModal, ListCard, Page, StatusBadge, optionsOf, useAll, useOrg } from '../../components/recruitment/kit';
+import OfferDocumentsModal from '../../components/recruitment/OfferDocumentsModal';
 import { useAuth } from '../../lib/auth';
 import { api } from '../../lib/api';
 import { clean, pageOf, paths, send, titleCase, today, useList } from '../../lib/recruitmentApi';
@@ -27,6 +28,7 @@ export default function OffersPage() {
   const [reject, setReject] = useState(null);
   const [handover, setHandover] = useState(null);
   const [dup, setDup] = useState(null);
+  const [docs, setDocs] = useState(null);
   const manage = can('recruitment.offer.manage');
   const approve = can('recruitment.offer.approve');
   const departments = useOrg('departments');
@@ -36,6 +38,7 @@ export default function OffersPage() {
 
   const actions = (o) => (
     <div className="flex flex-wrap items-center gap-1.5">
+      <Button variant="secondary" aria-label={`Documents for ${o.candidate_name}`} onClick={() => setDocs(o)}>Documents</Button>
       {manage && o.status === 'draft' && <Button variant="secondary" onClick={() => setAct({ row: o, verb: 'submit' })}>Submit</Button>}
       {approve && o.status === 'pending_approval' && (
         <>
@@ -210,6 +213,7 @@ export default function OffersPage() {
           list.reload();
         }}
       />
+      <OfferDocumentsModal offer={docs} onClose={() => setDocs(null)} />
     </Page>
   );
 }

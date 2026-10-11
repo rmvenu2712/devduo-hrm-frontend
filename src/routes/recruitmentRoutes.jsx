@@ -4,9 +4,11 @@ import Access from '../components/Access';
 import RecruitmentLayout, { RecruitmentHome } from '../pages/recruitment/RecruitmentLayout';
 import { RequisitionsPage, PostingsPage } from '../pages/recruitment/HiringPages';
 import { CandidatesPage, CandidateProfilePage } from '../pages/recruitment/CandidatePages';
+import CandidateImportPage from '../pages/recruitment/CandidateImportPage';
 import { PipelineIndexPage, PipelinePage } from '../pages/recruitment/PipelinePages';
 import InterviewsPage from '../pages/recruitment/InterviewsPage';
 import OffersPage from '../pages/recruitment/OffersPage';
+import OfferTemplatesPage from '../pages/recruitment/OfferTemplatesPage';
 import AnalyticsPage from '../pages/recruitment/AnalyticsPage';
 import { RECRUITMENT_ACCESS } from '../lib/recruitmentApi';
 
@@ -25,11 +27,13 @@ export const recruitmentRoutes = (
     <Route path="requisitions" element={<RequisitionsPage />} />
     <Route path="postings" element={<PostingsPage />} />
     <Route path="candidates" element={<CandidatesPage />} />
+    <Route path="candidates/import" element={<CandidateImportPage />} />
     <Route path="candidates/:uuid" element={<CandidateProfilePage />} />
     <Route path="pipeline" element={<PipelineIndexPage />} />
     <Route path="pipeline/:uuid" element={<PipelinePage />} />
     <Route path="interviews" element={<InterviewsPage />} />
     <Route path="offers" element={<OffersPage />} />
+    <Route path="offer-templates" element={<OfferTemplatesPage />} />
   </Route>
 );
 

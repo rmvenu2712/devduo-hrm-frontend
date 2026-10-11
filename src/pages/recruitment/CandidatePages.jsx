@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Button, Card, Pagination, useToast } from '../../components/ui';
 import { Banner, FormModal, KeyValues, ListCard, Page, StatusBadge, useAll } from '../../components/recruitment/kit';
+import ResumesPanel from '../../components/recruitment/ResumesPanel';
 import { useAuth } from '../../lib/auth';
 import { clean, fmtDate, pageOf, paths, send, titleCase, useList } from '../../lib/recruitmentApi';
 
@@ -39,7 +40,12 @@ export function CandidatesPage() {
     </div>
   );
   return (
-    <Page permission="recruitment.view" title="Candidates" description="Candidate records with consent and retention tracking." action={manage && <Button onClick={() => setForm(true)}>New candidate</Button>}>
+    <Page permission="recruitment.view" title="Candidates" description="Candidate records with consent and retention tracking." action={manage && (
+      <>
+        <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-brand-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-brand-950" to="/recruitment/candidates/import">Import candidates</Link>
+        <Button onClick={() => setForm(true)}>New candidate</Button>
+      </>
+    )}>
       {duplicates.length > 0 && (
         <Banner tone="warn" title="Possible duplicate candidates" action={<Button variant="secondary" onClick={() => setDuplicates([])}>Dismiss</Button>}>
           The candidate was saved, but {duplicates.length} other candidate(s) share this name. Review them; nothing was merged.
@@ -139,6 +145,7 @@ export function CandidateProfilePage() {
               )}
             </div>
           </Card>
+          <ResumesPanel candidateUuid={uuid} />
           <ListCard
             title="Applications"
             list={{ loading, error, reload: () => { candidates.reload(); apps.reload(); }, rows: mine }}
