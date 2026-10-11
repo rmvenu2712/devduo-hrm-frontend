@@ -8,7 +8,7 @@ import TeamAttendance from './TeamAttendance';
 import MonthCalendar from '../../components/attendance/MonthCalendar';
 import CalendarSection from '../../components/attendance/CalendarSection';
 import RequestSection from '../../components/attendance/RequestSection';
-import { validateRegularization } from '../../components/attendance/requestConfigs';
+import { requestConfigs, validateRegularization } from '../../components/attendance/requestConfigs';
 
 vi.mock('../../lib/api', async (orig) => ({ ...(await orig()), api: vi.fn() }));
 vi.mock('../../lib/auth', () => ({ useAuth: () => ({ can: () => true, enabled: () => true }) }));
@@ -33,7 +33,12 @@ const status = (over = {}) => ({
     timezone: 'UTC',
     worked_minutes_so_far: 0,
     expected_end: null,
-    schedule: { kind: 'working', shift: 'GEN', start: '2026-10-09T04:30:00Z', end: '2026-10-09T13:00:00Z' },
+    schedule: {
+      kind: 'working',
+      shift: 'GEN',
+      start: '2026-10-09T04:30:00Z',
+      end: '2026-10-09T13:00:00Z',
+    },
     last_punch: null,
     location: { required: false },
     ...over,
@@ -54,7 +59,10 @@ describe('PunchPage', () => {
     const posts = api.mock.calls.filter(([, o]) => o?.method === 'POST');
     await waitFor(() => expect(resolve).toBeTypeOf('function'));
     expect(posts).toHaveLength(1);
-    expect(posts[0][1].body).toMatchObject({ direction: 'IN', idempotency_key: expect.any(String) });
+    expect(posts[0][1].body).toMatchObject({
+      direction: 'IN',
+      idempotency_key: expect.any(String),
+    });
     expect(posts[0][1].body.latitude).toBeUndefined();
     resolve();
     expect(await screen.findByText('Checked in at 09:00.')).toBeInTheDocument();
@@ -62,7 +70,13 @@ describe('PunchPage', () => {
 
   it('requires consent before location is requested', async () => {
     api.mockResolvedValue(
-      status({ location: { required: true, purpose: 'Confirm you are on site.', privacy_note: 'Never tracked.' } }),
+      status({
+        location: {
+          required: true,
+          purpose: 'Confirm you are on site.',
+          privacy_note: 'Never tracked.',
+        },
+      }),
     );
     wrap(<PunchPage />);
     expect(await screen.findByText(/Confirm you are on site\./)).toBeInTheDocument();
@@ -94,12 +108,30 @@ describe('PunchPage', () => {
 
 describe('Calendar and day drawer', () => {
   const days = [
-    { uuid: 'd1', attendance_date: '2026-10-05', status: 'present', net_minutes: 480, required_minutes: 480, late_minutes: 0, overtime_minutes: 0 },
-    { uuid: 'd2', attendance_date: '2026-10-06', status: 'missing_punch', net_minutes: 0, required_minutes: 480, late_minutes: 0, overtime_minutes: 0 },
+    {
+      uuid: 'd1',
+      attendance_date: '2026-10-05',
+      status: 'present',
+      net_minutes: 480,
+      required_minutes: 480,
+      late_minutes: 0,
+      overtime_minutes: 0,
+    },
+    {
+      uuid: 'd2',
+      attendance_date: '2026-10-06',
+      status: 'missing_punch',
+      net_minutes: 0,
+      required_minutes: 480,
+      late_minutes: 0,
+      overtime_minutes: 0,
+    },
   ];
   it('renders statuses accessibly and reports selection', () => {
     const onSelect = vi.fn();
-    render(<MonthCalendar month="2026-10" days={days} onSelect={onSelect} onMonthChange={() => {}} />);
+    render(
+      <MonthCalendar month="2026-10" days={days} onSelect={onSelect} onMonthChange={() => {}} />,
+    );
     fireEvent.click(screen.getByRole('gridcell', { name: /Missing punch/ }));
     expect(onSelect).toHaveBeenCalledWith(days[1]);
     expect(screen.getByRole('gridcell', { name: /Present/ })).toBeInTheDocument();
@@ -111,7 +143,12 @@ describe('Calendar and day drawer', () => {
       if (path.includes('/days/d2'))
         return Promise.resolve({
           ...days[1],
-          explanation: { headline: 'Marked missing punch', lines: [{ label: 'Pairs', value: 'One in, no out' }], facts: [], actions: ['Request regularization'] },
+          explanation: {
+            headline: 'Marked missing punch',
+            lines: [{ label: 'Pairs', value: 'One in, no out' }],
+            facts: [],
+            actions: ['Request regularization'],
+          },
         });
       return Promise.reject(new ApiError('Punches unavailable', 500));
     });
@@ -128,7 +165,10 @@ describe('Calendar and day drawer', () => {
 describe('Regularization', () => {
   it('validates pure rules', () => {
     expect(
-      validateRegularization({ date: '2099-01-01', type: '', requested_in: '', requested_out: '', reason: '' }, '2026-10-09'),
+      validateRegularization(
+        { date: '2099-01-01', type: '', requested_in: '', requested_out: '', reason: '' },
+        '2026-10-09',
+      ),
     ).toMatchObject({
       date: expect.stringMatching(/future/),
       type: expect.any(String),
@@ -136,7 +176,16 @@ describe('Regularization', () => {
       reason: expect.any(String),
     });
     expect(
-      validateRegularization({ date: '2026-10-01', type: 'forgot_out', requested_in: '09:00', requested_out: '', reason: 'x' }, '2026-10-09'),
+      validateRegularization(
+        {
+          date: '2026-10-01',
+          type: 'forgot_out',
+          requested_in: '09:00',
+          requested_out: '',
+          reason: 'x',
+        },
+        '2026-10-09',
+      ),
     ).toEqual({ requested_out: expect.any(String) });
   });
 
@@ -151,16 +200,70 @@ describe('Regularization', () => {
     expect((await within(form).findAllByRole('alert')).length).toBeGreaterThan(0);
     expect(api.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false);
 
-    fireEvent.change(within(form).getByLabelText('Attendance date'), { target: { value: '2026-10-01' } });
+    fireEvent.change(within(form).getByLabelText('Attendance date'), {
+      target: { value: '2026-10-01' },
+    });
     fireEvent.click(within(form).getByRole('combobox', { name: /What happened/ }));
     fireEvent.click(await screen.findByRole('option', { name: 'Forgot check-in' }));
     fireEvent.change(within(form).getByLabelText('In time'), { target: { value: '09:00' } });
-    fireEvent.change(within(form).getByLabelText('Reason'), { target: { value: 'Badge reader down' } });
+    fireEvent.change(within(form).getByLabelText('Reason'), {
+      target: { value: 'Badge reader down' },
+    });
     fireEvent.click(within(form).getByRole('button', { name: 'Submit request' }));
     await waitFor(() => expect(api.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));
     const post = api.mock.calls.find(([, o]) => o?.method === 'POST');
     expect(post[0]).toBe('/v1/attendance/regularizations');
-    expect(post[1].body).toMatchObject({ date: '2026-10-01', type: 'forgot_in', requested_in: '09:00', idempotency_key: expect.any(String) });
+    expect(post[1].body).toMatchObject({
+      date: '2026-10-01',
+      type: 'forgot_in',
+      requested_in: '09:00',
+      idempotency_key: expect.any(String),
+    });
+  });
+});
+
+describe('Shift swaps', () => {
+  it('submits the colleague shift date separately from the requester date', async () => {
+    api.mockImplementation((path, opts = {}) => {
+      if (opts.method === 'POST') return Promise.resolve({ data: { uuid: 'swap-1' } });
+      if (path.startsWith('/v1/directory'))
+        return Promise.resolve({ data: [{ uuid: 'ben', display_name: 'Ben Lee' }] });
+      return Promise.resolve({ data: [] });
+    });
+    wrap(<RequestSection kind="swaps" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New request' }));
+    const form = await screen.findByRole('form', { name: /New shift swap request/ });
+    fireEvent.change(within(form).getByLabelText('Date of your shift'), {
+      target: { value: '2026-11-09' },
+    });
+    fireEvent.change(within(form).getByLabelText('Colleague shift date'), {
+      target: { value: '2026-11-10' },
+    });
+    fireEvent.change(within(form).getByLabelText('Search colleagues'), {
+      target: { value: 'Ben' },
+    });
+    fireEvent.click(within(form).getAllByRole('combobox')[1]);
+    fireEvent.click(await screen.findByRole('option', { name: 'Ben Lee' }));
+    fireEvent.change(within(form).getByLabelText('Reason'), { target: { value: 'Family event' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Submit request' }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        '/v1/shift-swaps',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.objectContaining({
+            work_date: '2026-11-09',
+            counterpart_date: '2026-11-10',
+            counterpart_uuid: 'ben',
+          }),
+        }),
+      ),
+    );
+    expect(
+      requestConfigs.swaps.fields.some(
+        (field) => field.name === 'counterpart_date' && field.showIf({ type: 'swap' }),
+      ),
+    ).toBe(true);
   });
 });
 
@@ -169,7 +272,21 @@ describe('TeamAttendance', () => {
     date: '2026-10-09',
     team_size: 2,
     groups: {
-      in: { count: 1, employees: [{ employee_uuid: 'a', name: 'Asha Rao', employee_number: 'E1', status: 'present', status_label: 'Present', first_in: '2026-10-09T04:00:00Z', last_out: null, late_minutes: 0 }] },
+      in: {
+        count: 1,
+        employees: [
+          {
+            employee_uuid: 'a',
+            name: 'Asha Rao',
+            employee_number: 'E1',
+            status: 'present',
+            status_label: 'Present',
+            first_in: '2026-10-09T04:00:00Z',
+            last_out: null,
+            late_minutes: 0,
+          },
+        ],
+      },
       absent: { count: 0, employees: [] },
       pending_regularizations: {
         count: 2,
@@ -191,7 +308,9 @@ describe('TeamAttendance', () => {
   it('approves inline and keeps other rows when one fails', async () => {
     api.mockImplementation((path, opts) => {
       if (opts?.method === 'POST')
-        return path.includes('r1') ? Promise.reject(new ApiError('Not your approval', 403)) : Promise.resolve({});
+        return path.includes('r1')
+          ? Promise.reject(new ApiError('Not your approval', 403))
+          : Promise.resolve({});
       return Promise.resolve(team);
     });
     wrap(<TeamAttendance />);
@@ -201,7 +320,10 @@ describe('TeamAttendance', () => {
     expect(screen.getAllByRole('button', { name: 'Approve Cy Lee' }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole('button', { name: 'Approve Cy Lee' })[0]);
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith('/v1/attendance/regularizations/r2/approve', expect.objectContaining({ method: 'POST' })),
+      expect(api).toHaveBeenCalledWith(
+        '/v1/attendance/regularizations/r2/approve',
+        expect.objectContaining({ method: 'POST' }),
+      ),
     );
   });
 });

@@ -14,7 +14,10 @@ export function useOptions(path, { map } = {}) {
         const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
         setOptions(
           rows
-            .map(map || ((r) => ({ value: String(r.id ?? r.code ?? r.uuid), label: r.name ?? r.label })))
+            .map(
+              map ||
+                ((r) => ({ value: String(r.id ?? r.code ?? r.uuid), label: r.name ?? r.label })),
+            )
             .filter((o) => o.value && o.label),
         );
       })
@@ -45,7 +48,7 @@ export function OrgSelect({ type, label, value, onChange, any = 'Any', required,
 }
 
 /** Type-ahead employee picker: search box plus a result list; emits the chosen employee uuid. */
-export function EmployeePicker({ label, value, onChange, valueLabel }) {
+export function EmployeePicker({ label, value, onChange, valueLabel, required = false, error }) {
   const [text, setText] = useState('');
   const q = useDebounced(text, 300);
   const options = useOptions(q.length >= 2 ? `/v1/employees?${query({ q, per_page: 10 })}` : null, {
@@ -70,7 +73,14 @@ export function EmployeePicker({ label, value, onChange, valueLabel }) {
         placeholder="Type 2+ letters"
         autoComplete="off"
       />
-      <Select label={label} value={value || ''} onChange={(e) => onChange(e.target.value)} options={list} />
+      <Select
+        label={label}
+        required={required}
+        error={error}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        options={list}
+      />
     </div>
   );
 }

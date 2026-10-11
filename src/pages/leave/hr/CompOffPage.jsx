@@ -7,7 +7,17 @@ import { Banner, Screen, StatusBadge, guarded } from '../../../components/timeof
 import { KeyValues, ListCard } from '../../../components/leave/hr/kit';
 import { useAuth } from '../../../lib/auth';
 import { useResource } from '../../../lib/hooks';
-import { dateOnly, options, paths, query, send, today, unwrap, units, useList } from '../../../lib/leaveHrApi';
+import {
+  dateOnly,
+  options,
+  paths,
+  query,
+  send,
+  today,
+  unwrap,
+  units,
+  useList,
+} from '../../../lib/leaveHrApi';
 
 const who = (e) => e?.name ?? e?.employee_number ?? (typeof e === 'string' ? e : '—');
 
@@ -16,13 +26,27 @@ function Trace({ credit, onClose }) {
   const t = res.data ? unwrap(res.data) : null;
   return (
     <Modal open onClose={onClose} title="Comp-off trace">
-      {res.loading ? <Skeleton rows={2} /> : res.error ? <ErrorState error={res.error} onRetry={res.reload} /> : (
+      {res.loading ? (
+        <Skeleton rows={2} />
+      ) : res.error ? (
+        <ErrorState error={res.error} onRetry={res.reload} />
+      ) : (
         <div className="space-y-3 text-xs">
-          <KeyValues data={{ ...t.source, units: units(t.units), expires_on: dateOnly(t.expires_on) }} />
+          <KeyValues
+            data={{ ...t.source, units: units(t.units), expires_on: dateOnly(t.expires_on) }}
+          />
           <h3 className="mb-1 text-sm">Used by</h3>
           {(t.uses ?? []).length ? (
-            <ul className="m-0 list-disc pl-5">{t.uses.map((u, i) => <li key={i}>{dateOnly(u.date)}: {units(u.units)} ({u.status})</li>)}</ul>
-          ) : <p className="m-0">Not used yet.</p>}
+            <ul className="m-0 list-disc pl-5">
+              {t.uses.map((u, i) => (
+                <li key={i}>
+                  {dateOnly(u.date)}: {units(u.units)} ({u.status})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="m-0">Not used yet.</p>
+          )}
         </div>
       )}
     </Modal>
@@ -45,8 +69,16 @@ function CompOffPageInner() {
   };
   const columns = [
     { key: 'employee', label: 'Employee', render: (c) => who(c.employee) },
-    { key: 'source', label: 'Source', render: (c) => (c.source_type ?? c.source?.type ?? '—').replace(/_/g, ' ') },
-    { key: 'work_date', label: 'Worked on', render: (c) => dateOnly(c.work_date ?? c.source?.work_date) },
+    {
+      key: 'source',
+      label: 'Source',
+      render: (c) => (c.source_type ?? c.source?.type ?? '—').replace(/_/g, ' '),
+    },
+    {
+      key: 'work_date',
+      label: 'Worked on',
+      render: (c) => dateOnly(c.work_date ?? c.source?.work_date),
+    },
     { key: 'units', label: 'Units', render: (c) => units(c.units) },
     { key: 'remaining', label: 'Remaining', priority: 'md', render: (c) => units(c.remaining) },
     { key: 'expires_on', label: 'Expires', priority: 'lg', render: (c) => dateOnly(c.expires_on) },
@@ -58,11 +90,29 @@ function CompOffPageInner() {
         <span className="flex flex-wrap gap-1.5">
           {c.status === 'pending' && decideRight && (
             <>
-              <Button variant="secondary" aria-label={`Approve comp-off for ${who(c.employee)}`} onClick={() => setDecide({ c, kind: 'approve' })}>Approve</Button>
-              <Button variant="secondary" aria-label={`Reject comp-off for ${who(c.employee)}`} onClick={() => setDecide({ c, kind: 'reject' })}>Reject</Button>
+              <Button
+                variant="secondary"
+                aria-label={`Approve comp-off for ${who(c.employee)}`}
+                onClick={() => setDecide({ c, kind: 'approve' })}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="secondary"
+                aria-label={`Reject comp-off for ${who(c.employee)}`}
+                onClick={() => setDecide({ c, kind: 'reject' })}
+              >
+                Reject
+              </Button>
             </>
           )}
-          <Button variant="ghost" aria-label={`Trace comp-off for ${who(c.employee)}`} onClick={() => setTrace(c)}>Trace</Button>
+          <Button
+            variant="ghost"
+            aria-label={`Trace comp-off for ${who(c.employee)}`}
+            onClick={() => setTrace(c)}
+          >
+            Trace
+          </Button>
         </span>
       ),
     },
@@ -72,29 +122,60 @@ function CompOffPageInner() {
       title="Comp-off credits"
       description="Time off earned for working overtime, holidays or rest days. Approval posts a credit that expires on a set date."
       permission="leave.compoff.manage|leave.manage"
-      action={manage && <Button onClick={() => setGrant(true)}><Plus size={14} /> Grant credit</Button>}
+      action={
+        manage && (
+          <Button onClick={() => setGrant(true)}>
+            <Plus size={14} /> Grant credit
+          </Button>
+        )
+      }
     >
       <ListCard
         title="Credits"
         list={list}
         columns={columns}
-        extra={<div className="px-6 pb-3"><Select label="Status" value={status} options={options(['pending', 'approved', 'rejected'], 'All')} onChange={(e) => setStatus(e.target.value)} /></div>}
-        mobile={{ title: (c) => who(c.employee), subtitle: (c) => `${units(c.units)} units · ${dateOnly(c.work_date ?? c.source?.work_date)}`, badge: (c) => <StatusBadge status={c.status} /> }}
-        empty={{ title: 'No comp-off credits', description: 'Credits earned from overtime or granted by HR appear here.' }}
+        extra={
+          <div className="px-6 pb-3">
+            <Select
+              label="Status"
+              value={status}
+              options={options(['pending', 'approved', 'rejected'], 'All')}
+              onChange={(e) => setStatus(e.target.value)}
+            />
+          </div>
+        }
+        mobile={{
+          title: (c) => who(c.employee),
+          subtitle: (c) =>
+            `${units(c.units)} units · ${dateOnly(c.work_date ?? c.source?.work_date)}`,
+          badge: (c) => <StatusBadge status={c.status} />,
+        }}
+        empty={{
+          title: 'No comp-off credits',
+          description: 'Credits earned from overtime or granted by HR appear here.',
+        }}
       />
       <FormDialog
         open={grant}
         onClose={() => setGrant(false)}
         title="Grant comp-off credit"
-        notice={<Banner tone="info">An authorised grant credits the employee directly with the units you enter. It is recorded in the audit trail.</Banner>}
+        notice={
+          <Banner tone="info">
+            An authorised grant credits the employee directly with the units you enter. It is
+            recorded in the audit trail.
+          </Banner>
+        }
         fields={[
-          { name: 'employee', label: 'Employee ID (uuid)', required: true },
+          { name: 'employee', label: 'Employee', type: 'employee', required: true },
           { name: 'units', label: 'Units (days)', required: true, hint: 'Up to 4 decimals.' },
           { name: 'work_date', label: 'Work date', type: 'date', required: true, default: today() },
           { name: 'note', label: 'Note', type: 'textarea' },
         ]}
         onSubmit={async (b) => {
-          await send('POST', paths.compOff, { source_type: 'authorized', ...Object.fromEntries(Object.entries(b).filter(([, v]) => v !== null)) });
+          await send('POST', paths.compOff, {
+            source_type: 'authorized',
+            ...Object.fromEntries(Object.entries(b).filter(([, v]) => v !== null)),
+          });
           done('Comp-off credit created');
         }}
       />
@@ -117,4 +198,7 @@ function CompOffPageInner() {
   );
 }
 
-export default guarded(CompOffPageInner, { title: 'Comp-off credits', permission: 'leave.compoff.manage|leave.manage' });
+export default guarded(CompOffPageInner, {
+  title: 'Comp-off credits',
+  permission: 'leave.compoff.manage|leave.manage',
+});

@@ -1,9 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button, Checkbox, ErrorState, FormError, Input, Modal, MultiSelect, Select, Skeleton, Textarea, useToast } from '../ui';
+import {
+  Button,
+  Checkbox,
+  ErrorState,
+  FormError,
+  Input,
+  Modal,
+  MultiSelect,
+  Select,
+  Skeleton,
+  Textarea,
+  useToast,
+} from '../ui';
 import ResponsiveList from '../ResponsiveList';
 import { Panel } from './parts';
 import { send, useAction, useList } from '../../lib/timeOfficeApi';
+import { EmployeePicker } from '../people/lookups';
 
 const initial = (fields, row) =>
   Object.fromEntries(
@@ -36,12 +49,60 @@ export function FieldSet({ fields, values, setValues, errors = {} }) {
     .map((f) => {
       const set = (v) => setValues((s) => ({ ...s, [f.name]: v }));
       const err = errors[f.name]?.join?.(' ');
+      if (f.type === 'employee')
+        return (
+          <EmployeePicker
+            key={f.name}
+            label={f.label}
+            value={values[f.name]}
+            onChange={set}
+            required={f.required}
+            error={err}
+          />
+        );
       if (f.type === 'select')
-        return <Select key={f.name} label={f.label} options={f.options} value={values[f.name]} required={f.required} error={err} onChange={(e) => set(e.target.value)} />;
-      if (f.type === 'checkbox') return <div key={f.name} className="mb-5"><Checkbox label={f.label} checked={values[f.name]} onChange={(e) => set(e.target.checked)} /></div>;
-      if (f.type === 'multi') return <MultiSelect key={f.name} label={f.label} options={f.options} value={values[f.name]} onChange={set} />;
+        return (
+          <Select
+            key={f.name}
+            label={f.label}
+            options={f.options}
+            value={values[f.name]}
+            required={f.required}
+            error={err}
+            onChange={(e) => set(e.target.value)}
+          />
+        );
+      if (f.type === 'checkbox')
+        return (
+          <div key={f.name} className="mb-5">
+            <Checkbox
+              label={f.label}
+              checked={values[f.name]}
+              onChange={(e) => set(e.target.checked)}
+            />
+          </div>
+        );
+      if (f.type === 'multi')
+        return (
+          <MultiSelect
+            key={f.name}
+            label={f.label}
+            options={f.options}
+            value={values[f.name]}
+            onChange={set}
+          />
+        );
       if (f.type === 'textarea' || f.type === 'json')
-        return <Textarea key={f.name} label={f.label} value={values[f.name]} required={f.required} error={err} onChange={(e) => set(e.target.value)} />;
+        return (
+          <Textarea
+            key={f.name}
+            label={f.label}
+            value={values[f.name]}
+            required={f.required}
+            error={err}
+            onChange={(e) => set(e.target.value)}
+          />
+        );
       return (
         <Input
           key={f.name}
@@ -61,7 +122,17 @@ export function FieldSet({ fields, values, setValues, errors = {} }) {
 }
 
 /** Create/edit dialog around FieldSet. Server field errors are shown inline; success closes and calls onSaved. */
-export function FormDialog({ open, onClose, title, fields, row, onSubmit, submitLabel = 'Save', children, notice }) {
+export function FormDialog({
+  open,
+  onClose,
+  title,
+  fields,
+  row,
+  onSubmit,
+  submitLabel = 'Save',
+  children,
+  notice,
+}) {
   const [values, setValues] = useState(() => initial(fields, row));
   const { busy, error, run, clear } = useAction();
   useEffect(() => {
@@ -107,7 +178,26 @@ export function FormDialog({ open, onClose, title, fields, row, onSubmit, submit
  * Generic list + create/edit panel for configuration catalogues (shifts, work weeks, devices ...).
  * props: title, listPath, fields, columns, mobile, createPath, itemPath(row) (edit target, sent with `method`, PATCH by default), pick(response) -> rows, canEdit, empty, rowActions(row, reload)
  */
-export default function CrudPanel({ title, listPath, fields, columns, mobile, createPath = listPath.split('?')[0], itemPath, canEdit = true, noun = 'record', empty, extra, onSaved, rowActions, formChildren, toPayload, fromRow, method = 'PATCH', pick }) {
+export default function CrudPanel({
+  title,
+  listPath,
+  fields,
+  columns,
+  mobile,
+  createPath = listPath.split('?')[0],
+  itemPath,
+  canEdit = true,
+  noun = 'record',
+  empty,
+  extra,
+  onSaved,
+  rowActions,
+  formChildren,
+  toPayload,
+  fromRow,
+  method = 'PATCH',
+  pick,
+}) {
   const fetched = useList(listPath);
   const list = pick ? { ...fetched, rows: fetched.data ? pick(fetched.data) : [] } : fetched;
   const toast = useToast();
@@ -115,13 +205,20 @@ export default function CrudPanel({ title, listPath, fields, columns, mobile, cr
   async function save(body) {
     const editingRow = editing && Object.keys(editing).length > 0 ? editing : null;
     const payload = toPayload ? toPayload(body, editingRow) : body;
-    const r = editingRow ? await send(method, itemPath(editingRow), payload) : await send('POST', createPath, payload);
+    const r = editingRow
+      ? await send(method, itemPath(editingRow), payload)
+      : await send('POST', createPath, payload);
     toast(editingRow ? `${noun} updated` : `${noun} created`);
     list.reload();
     onSaved?.(r);
     return r;
   }
-  const cols = rowActions ? [...columns, { key: '_actions', label: 'Actions', render: (row) => rowActions(row, list.reload) }] : columns;
+  const cols = rowActions
+    ? [
+        ...columns,
+        { key: '_actions', label: 'Actions', render: (row) => rowActions(row, list.reload) },
+      ]
+    : columns;
   return (
     <Panel
       title={title}
@@ -146,7 +243,14 @@ export default function CrudPanel({ title, listPath, fields, columns, mobile, cr
           mobile={mobile}
           rowKey={(r) => r.uuid ?? r.id}
           onRowClick={canEdit && itemPath ? setEditing : undefined}
-          empty={empty ?? { title: `No ${noun}s yet`, description: canEdit ? `Create the first ${noun} to get started.` : 'Nothing has been set up yet.' }}
+          empty={
+            empty ?? {
+              title: `No ${noun}s yet`,
+              description: canEdit
+                ? `Create the first ${noun} to get started.`
+                : 'Nothing has been set up yet.',
+            }
+          }
         />
       )}
       <FormDialog

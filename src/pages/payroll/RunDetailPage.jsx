@@ -13,6 +13,48 @@ const STAGES = ['inputs', 'calculating', 'review', 'approval', 'approved', 'lock
 const RUNNING = ['calculating', 'validating'];
 const LOCKED = ['locked', 'outputs', 'payment', 'closed'];
 
+function InputImportPanel({ periodUuid }) {
+  const history = useResource(paths.inputImports);
+  const [file, setFile] = useState(null);
+  const [source, setSource] = useState('bonus');
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const recent = history.data?.data?.[0];
+  const upload = async () => {
+    setBusy(true); setError('');
+    try {
+      const body = new FormData(); body.append('file', file); body.append('period_uuid', periodUuid); body.append('source', source);
+      setPreview(await api(paths.inputImportPreview, { method: 'POST', body }));
+      history.reload();
+    } catch (e) { setError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
+    finally { setBusy(false); }
+  };
+  const act = async (part) => {
+    if (!preview) return;
+    setBusy(true); setError('');
+    try { setPreview(await api(paths.inputImport(preview.uuid, part), { method: 'POST', body: {} })); history.reload(); }
+    catch (e) { setError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
+    finally { setBusy(false); }
+  };
+  return <Card title="Import payroll inputs" className="mt-5">
+    <Section><p className="mb-4 text-sm text-slate-500">CSV/XLSX columns: employee_number, kind, and amount or quantity; component_code is optional. Preview does not create payroll inputs.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="text-sm">File<input className="mt-1 block w-full text-sm" type="file" accept=".csv,.xlsx" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); setError(''); }} /></label>
+        <label className="text-sm">Input source<select className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={source} onChange={(e) => setSource(e.target.value)}>{['bonus', 'commission', 'variable_pay', 'reimbursement', 'overtime', 'adjustment', 'manual', 'api'].map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></label>
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button disabled={!file || busy} loading={busy} onClick={upload}>Preview file</Button>
+        {preview?.status === 'previewed' && preview.rows_ok > 0 && <Button variant="secondary" disabled={busy} onClick={() => act('commit')}>Commit {preview.rows_ok} valid rows</Button>}
+        {preview?.status === 'committed' && preview.rows_error > 0 && <Button variant="secondary" disabled={busy} onClick={() => act('retry')}>Retry failed rows</Button>}
+      </div>
+      {preview && <div className="mt-4"><p className="text-sm">{preview.rows_ok} committed/valid · {preview.rows_error} errors · {preview.rows_duplicate} duplicates</p><div className="max-h-48 overflow-auto"><table className="w-full text-left text-sm"><thead><tr><th className="py-2">Row</th><th>Status</th><th>Details</th></tr></thead><tbody>{preview.rows.map((r) => <tr key={r.row_number} className="border-t border-slate-200 dark:border-slate-700"><td className="py-2">{r.row_number}</td><td>{titleCase(r.status)}</td><td>{r.errors?.join(' ') || 'Ready'}</td></tr>)}</tbody></table></div></div>}
+      {recent && <p className="mt-3 text-xs text-slate-500">Latest import: {recent.rows_ok} successful of {recent.rows_total} · {titleCase(recent.status)}</p>}
+    </Section>
+  </Card>;
+}
+
 /** Polls /progress after a calculation is started until the run leaves the calculating states. */
 function useProgress(uuid, status, active, onDone) {
   const [progress, setProgress] = useState(null);
@@ -174,6 +216,7 @@ export default function RunDetailPage() {
                       {can('payroll.unlock.approve') && (run.reopen_requested || run.reopen_request) && <Button variant="secondary" onClick={() => setDialog('reopen-decision')}>Decide on reopen request</Button>}
                       {canRun && !locked && status !== 'cancelled' && status !== 'approved' && <Button variant="danger" onClick={() => setDialog('cancel')}>Cancel run</Button>}
                     </div>
+                    {can('payroll.inputs.manage') && !locked && ['inputs', 'review', 'reopened'].includes(status) && <InputImportPanel key={run.period.uuid} periodUuid={run.period.uuid} />}
                   </Section>
                 </Card>
               </>

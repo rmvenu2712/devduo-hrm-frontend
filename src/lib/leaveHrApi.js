@@ -21,6 +21,10 @@ export { query };
 
 export const L = '/v1/leave';
 export const paths = {
+  settings: `${L}/settings`,
+  bulkActions: `${L}/bulk-actions`,
+  bulkActionPreview: (key) => `${L}/bulk-actions/${encodeURIComponent(key)}/preview`,
+  bulkActionRun: (key) => `${L}/bulk-actions/${encodeURIComponent(key)}/run`,
   commandCenter: `${L}/command-center`,
   types: `${L}/types`,
   typesSeed: `${L}/types/seed-defaults`,
@@ -81,25 +85,75 @@ export const LEAVE_HR_ACCESS =
 export const HR = '/leave/hr';
 /** Section navigation. `permission` is an any-of list; the nav shows only what the user may open. */
 export const NAV = [
-  { to: HR, label: 'Command center', end: true, permission: 'leave.reports.view|leave.manage|leave.team.view' },
+  {
+    to: HR,
+    label: 'Command center',
+    end: true,
+    permission: 'leave.reports.view|leave.manage|leave.team.view',
+  },
   { to: `${HR}/types`, label: 'Leave types', permission: 'leave.policy.manage|leave.manage' },
   { to: `${HR}/policies`, label: 'Policies', permission: 'leave.policy.manage|leave.manage' },
   { to: `${HR}/cycles`, label: 'Cycles', permission: 'leave.policy.manage|leave.manage' },
   { to: `${HR}/accruals`, label: 'Accrual runs', permission: 'leave.accrual.run|leave.manage' },
-  { to: `${HR}/adjustments`, label: 'Adjustments', permission: 'leave.adjust|leave.adjust.approve|leave.manage' },
-  { to: `${HR}/carry-forward`, label: 'Carry-forward & expiry', permission: 'leave.accrual.run|leave.manage' },
+  {
+    to: `${HR}/adjustments`,
+    label: 'Adjustments',
+    permission: 'leave.adjust|leave.adjust.approve|leave.manage',
+  },
+  {
+    to: `${HR}/carry-forward`,
+    label: 'Carry-forward & expiry',
+    permission: 'leave.accrual.run|leave.manage',
+  },
   { to: `${HR}/comp-off`, label: 'Comp-off', permission: 'leave.compoff.manage|leave.manage' },
   { to: `${HR}/imports`, label: 'Imports', permission: 'leave.import|leave.manage' },
   { to: `${HR}/locks`, label: 'Locks', permission: 'leave.lock|leave.unlock|leave.manage' },
   { to: `${HR}/transfers`, label: 'Transfers & separation', permission: 'leave.manage' },
   { to: `${HR}/payroll`, label: 'Payroll contract', permission: 'leave.manage|leave.reports.view' },
-  { to: `${HR}/simulations`, label: 'Simulators', permission: 'leave.simulate|leave.policy.manage' },
+  {
+    to: `${HR}/simulations`,
+    label: 'Simulators',
+    permission: 'leave.simulate|leave.policy.manage',
+  },
   { to: `${HR}/reports`, label: 'Reports', permission: 'leave.reports.view|leave.manage' },
-  { to: `${HR}/quality`, label: 'Data quality & setup', permission: 'leave.manage|leave.reports.view|leave.policy.manage' },
+  {
+    to: `${HR}/quality`,
+    label: 'Data quality & setup',
+    permission: 'leave.manage|leave.reports.view|leave.policy.manage',
+  },
+  { to: `${HR}/settings`, label: 'Settings', permission: 'leave.manage|leave.policy.manage' },
+  { to: `${HR}/bulk-actions`, label: 'Bulk actions', permission: 'leave.manage' },
 ];
 
-export const LEAVE_KINDS = ['annual', 'casual', 'sick', 'medical', 'parental', 'maternity', 'paternity', 'bereavement', 'marriage', 'study', 'sabbatical', 'unpaid', 'comp_off', 'optional_holiday', 'custom'];
-export const ASSIGN_TARGETS = ['tenant', 'country', 'legal_entity', 'business_unit', 'location', 'department', 'team', 'employee_group', 'employee_type', 'employee'];
+export const LEAVE_KINDS = [
+  'annual',
+  'casual',
+  'sick',
+  'medical',
+  'parental',
+  'maternity',
+  'paternity',
+  'bereavement',
+  'marriage',
+  'study',
+  'sabbatical',
+  'unpaid',
+  'comp_off',
+  'optional_holiday',
+  'custom',
+];
+export const ASSIGN_TARGETS = [
+  'tenant',
+  'country',
+  'legal_entity',
+  'business_unit',
+  'location',
+  'department',
+  'team',
+  'employee_group',
+  'employee_type',
+  'employee',
+];
 
 /** Units arrive as 4-dp strings. Show them without trailing zeros but never as floats. */
 export const units = (v) => {
@@ -110,15 +164,21 @@ export const units = (v) => {
 export const dateOnly = (v) => (v ? String(v).slice(0, 10) : '—');
 export const options = (values, empty) => [
   ...(empty === undefined ? [] : [{ value: '', label: empty }]),
-  ...values.map((v) => (typeof v === 'object' ? v : { value: v, label: String(v).replace(/[_-]+/g, ' ') })),
+  ...values.map((v) =>
+    typeof v === 'object' ? v : { value: v, label: String(v).replace(/[_-]+/g, ' ') },
+  ),
 ];
 export const typeOptions = (types, empty) => [
   ...(empty === undefined ? [] : [{ value: '', label: empty }]),
   ...types.map((t) => ({ value: t.code, label: `${t.name} (${t.code})` })),
 ];
 /** Splits "a, b\nc" into trimmed ids. */
-export const splitIds = (text) => String(text ?? '').split(/[\s,;]+/).filter(Boolean);
-export const newKey = () => (globalThis.crypto?.randomUUID?.() ?? `k-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+export const splitIds = (text) =>
+  String(text ?? '')
+    .split(/[\s,;]+/)
+    .filter(Boolean);
+export const newKey = () =>
+  globalThis.crypto?.randomUUID?.() ?? `k-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 /** Re-runs `reload` every few seconds while `active` (queued/running work). */
 export function usePoll(active, reload, deps = [], ms = 3000) {

@@ -17,6 +17,8 @@ import PayrollPage from '../pages/leave/hr/PayrollPage';
 import SimulationsPage from '../pages/leave/hr/SimulationsPage';
 import ReportsPage from '../pages/leave/hr/ReportsPage';
 import QualityPage from '../pages/leave/hr/QualityPage';
+import SettingsPage from '../pages/leave/hr/SettingsPage';
+import BulkActionsPage from '../pages/leave/hr/BulkActionsPage';
 import { LEAVE_HR_ACCESS } from '../lib/leaveHrApi';
 
 export { LEAVE_HR_ACCESS };
@@ -47,5 +49,7 @@ export const leaveHrRoutes = (
     <Route path="simulations" element={<SimulationsPage />} />
     <Route path="reports" element={<ReportsPage />} />
     <Route path="quality" element={<QualityPage />} />
+    <Route path="settings" element={<SettingsPage />} />
+    <Route path="bulk-actions" element={<BulkActionsPage />} />
   </Route>
 );

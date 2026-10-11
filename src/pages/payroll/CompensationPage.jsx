@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Select, Skeleton, ErrorState, useToast } from '../../components/ui';
+import { Button, Modal, Select, Skeleton, ErrorState, useToast } from '../../components/ui';
 import { Amount, Banner, ConfirmDialog, ConfirmPreview, FormModal, ListCard, Page, StatusBadge, Tiles, optionsOf, useEmployees, withEmpty } from '../../components/payroll/kit';
 import { useAuth } from '../../lib/auth';
 import { useResource } from '../../lib/hooks';
@@ -73,10 +73,20 @@ export default function CompensationPage() {
   const [employee, setEmployee] = useState('');
   const [status, setStatus] = useState('pending');
   const revisions = useList(`${paths.revisions}?${query({ status })}`);
+  const batches = useList(paths.revisionBatches);
+  const [batchUuid, setBatchUuid] = useState('');
+  const batchDetail = useResource(batchUuid ? paths.revisionBatch(batchUuid) : null);
   const pendingRecords = useList(`${paths.compensations}?status=pending`);
   const [form, setForm] = useState(false);
   const [proposal, setProposal] = useState(null);
   const [decision, setDecision] = useState(null);
+  const [importFile, setImportFile] = useState(null);
+  const [importType, setImportType] = useState('increment');
+  const [importDate, setImportDate] = useState('');
+  const [importReason, setImportReason] = useState('');
+  const [importPreview, setImportPreview] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
   const manage = can('payroll.compensation.manage');
   const approve = can('payroll.compensation.approve');
 
@@ -98,6 +108,34 @@ export default function CompensationPage() {
       <div className="mb-4 max-w-md">
         <Select label="Employee" options={withEmpty(employees, 'Choose an employee')} value={employee} onChange={(e) => setEmployee(e.target.value)} />
       </div>
+      {manage && <section className="mb-6 rounded-xl border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="comp-import-title">
+        <h2 id="comp-import-title" className="mb-1 text-lg font-semibold">Import compensation revisions</h2>
+        <p className="mb-4 text-sm text-slate-500">Upload a CSV or XLSX with employee_number, component_code, and amount columns. Preview checks rows without submitting revisions.</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-sm">File<input className="mt-1 block w-full text-sm" type="file" accept=".csv,.xlsx" onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportPreview(null); setImportError(''); }} /></label>
+          <label className="text-sm">Revision type<select className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={importType} onChange={(e) => setImportType(e.target.value)}>{TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
+          <label className="text-sm">Effective date<input className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} /></label>
+          <label className="text-sm">Reason<input className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={importReason} onChange={(e) => setImportReason(e.target.value)} /></label>
+        </div>
+        {importError && <p className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">{importError}</p>}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button disabled={!importFile || !importDate || !importReason || importBusy} onClick={async () => {
+            setImportBusy(true); setImportError('');
+            try { const body = new FormData(); body.append('file', importFile); body.append('type', importType); body.append('effective_date', importDate); body.append('reason', importReason); setImportPreview(await api(paths.compensationImportPreview, { method: 'POST', body })); }
+            catch (e) { setImportError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
+            finally { setImportBusy(false); }
+          }}>{importBusy ? 'Working…' : 'Preview import'}</Button>
+          {importPreview?.status === 'previewed' && importPreview.rows_ok > 0 && <Button variant="secondary" disabled={importBusy} onClick={async () => {
+            setImportBusy(true); setImportError('');
+            try { const result = await api(paths.compensationImportCommit(importPreview.uuid), { method: 'POST', body: {} }); setImportPreview({ ...importPreview, status: result.status, batch_uuid: result.batch_uuid }); revisions.reload(); toast('Valid revisions submitted for independent approval'); }
+            catch (e) { setImportError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
+            finally { setImportBusy(false); }
+          }}>Commit {importPreview.rows_ok} valid rows</Button>}
+        </div>
+        {importPreview && <div className="mt-4" aria-live="polite"><p className="text-sm">{importPreview.status === 'committed' ? `Committed. Batch ${importPreview.batch_uuid} is awaiting independent approval.` : `${importPreview.rows_ok} valid · ${importPreview.rows_error} errors · ${importPreview.rows_duplicate} duplicates`}</p>
+          <div className="max-h-56 overflow-auto"><table className="w-full text-left text-sm"><thead><tr><th className="py-2">Row</th><th>Status</th><th>Details</th></tr></thead><tbody>{importPreview.rows.map((row) => <tr key={row.row_number} className="border-t border-slate-200 dark:border-slate-700"><td className="py-2">{row.row_number}</td><td>{titleCase(row.status)}</td><td>{row.errors?.join(' ') || 'Ready'}</td></tr>)}</tbody></table></div>
+        </div>}
+      </section>}
       {employee && <EmployeePanel key={employee} employee={employee} />}
       <div className="mb-4 max-w-xs">
         <Select label="Revision status" options={withEmpty(['pending', 'applied', 'rejected', 'cancelled'].map((s) => ({ value: s, label: titleCase(s) })), 'Any status')} value={status} onChange={(e) => setStatus(e.target.value)} />
@@ -126,6 +164,20 @@ export default function CompensationPage() {
         )}
         empty={{ title: 'No revisions', description: 'Proposed compensation revisions appear here.' }}
       />
+      <ListCard title="Revision batches" list={batches} columns={[
+        { key: 'name', label: 'Batch' },
+        { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
+        { key: 'employees', label: 'Employees', render: (r) => `${r.employees.submitted} submitted / ${r.employees.total} total` },
+        { key: 'effective_date', label: 'Effective' },
+        { key: 'view', label: '', render: (r) => <Button variant="secondary" onClick={() => setBatchUuid(r.uuid)}>Details</Button> },
+      ]} empty={{ title: 'No batches', description: 'Submitted mass revisions and file imports will appear here.' }} />
+      <Modal open={Boolean(batchUuid)} onClose={() => setBatchUuid('')} title="Compensation revision batch">
+        {batchDetail.loading ? <Skeleton rows={2} /> : batchDetail.error ? <ErrorState error={batchDetail.error} onRetry={batchDetail.reload} /> : batchDetail.data && <div className="space-y-4">
+          <p className="text-sm">{batchDetail.data.name} · {titleCase(batchDetail.data.status)} · effective {batchDetail.data.effective_date}</p>
+          <ListCard title="Revisions" list={{ loading: false, error: null, reload: batchDetail.reload, rows: batchDetail.data.revisions ?? [] }} columns={[{ key: 'employee_uuid', label: 'Employee reference' }, { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> }]} />
+          {batchDetail.data.errors?.length > 0 && <ul className="list-disc pl-5 text-sm">{batchDetail.data.errors.map((e) => <li key={`${e.row}-${e.message}`}>Row {e.row}: {e.message}</li>)}</ul>}
+        </div>}
+      </Modal>
       <ListCard
         title="Pending compensation records"
         list={pendingRecords}

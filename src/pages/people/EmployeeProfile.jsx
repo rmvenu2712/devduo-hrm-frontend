@@ -15,7 +15,12 @@ import DocumentsPanel from '../../components/people/DocumentsPanel';
 import SensitivePanel from '../../components/people/SensitivePanel';
 import NotesPanel from '../../components/people/NotesPanel';
 import CustomFieldsPanel from '../../components/people/CustomFieldsPanel';
-import { Completeness, Employee360, OrganizationMemory, Timeline } from '../../components/people/ProfileInsights';
+import {
+  Completeness,
+  Employee360,
+  OrganizationMemory,
+  Timeline,
+} from '../../components/people/ProfileInsights';
 
 /** Tabs exist only for sections the API says this viewer may see (`viewer.sections`). */
 export function buildTabs(sections = [], canView = false) {
@@ -81,12 +86,23 @@ function TabBody({ tab, uuid, profile, sections, edit, canView, tabs, onGo, relo
     case 'job':
       return <JobPanel uuid={uuid} profile={profile} sections={sections} />;
     case 'personal':
-      return <PersonalPanel uuid={uuid} person={profile.person || {}} mode={edit.personal || 'none'} onSaved={reload} />;
+      return (
+        <PersonalPanel
+          uuid={uuid}
+          person={profile.person || {}}
+          mode={edit.personal || 'none'}
+          onSaved={reload}
+        />
+      );
     case 'contact':
       return (
         <>
-          {sections.includes('contact') && <RecordSection uuid={uuid} config={cfg.contacts} mode={edit.contact || 'none'} />}
-          {sections.includes('address') && <RecordSection uuid={uuid} config={cfg.addresses} mode={edit.address || 'none'} />}
+          {sections.includes('contact') && (
+            <RecordSection uuid={uuid} config={cfg.contacts} mode={edit.contact || 'none'} />
+          )}
+          {sections.includes('address') && (
+            <RecordSection uuid={uuid} config={cfg.addresses} mode={edit.address || 'none'} />
+          )}
         </>
       );
     case 'emergency':
@@ -100,7 +116,13 @@ function TabBody({ tab, uuid, profile, sections, edit, canView, tabs, onGo, relo
     case 'skills':
       return <RecordSection uuid={uuid} config={cfg.skills} mode={edit.skill || 'none'} />;
     case 'certifications':
-      return <RecordSection uuid={uuid} config={cfg.certifications} mode={edit.certification || 'none'} />;
+      return (
+        <RecordSection
+          uuid={uuid}
+          config={cfg.certifications}
+          mode={edit.certification || 'none'}
+        />
+      );
     case 'documents':
       return <DocumentsPanel uuid={uuid} mode={edit.document || 'none'} />;
     case 'identity':
@@ -154,19 +176,30 @@ export default function EmployeeProfile() {
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
                     <StatusBadge status={h.status} text={h.status_label} />
-                    {h.pronouns && <span className="text-slate-500 dark:text-slate-400">{h.pronouns}</span>}
+                    {h.pronouns && (
+                      <span className="text-slate-500 dark:text-slate-400">{h.pronouns}</span>
+                    )}
                     {h.manager && (
-                      <Link className="text-brand-600 dark:text-brand-300" to={`/people/${h.manager.uuid}`}>
+                      <Link
+                        className="text-brand-600 dark:text-brand-300"
+                        to={`/people/${h.manager.uuid}`}
+                      >
                         Reports to {h.manager.name}
                       </Link>
                     )}
                     {h.work_email && (
-                      <a className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300" href={`mailto:${h.work_email}`}>
+                      <a
+                        className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300"
+                        href={`mailto:${h.work_email}`}
+                      >
                         <Mail size={14} /> Email
                       </a>
                     )}
                     {h.work_phone && (
-                      <a className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300" href={`tel:${h.work_phone}`}>
+                      <a
+                        className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300"
+                        href={`tel:${h.work_phone}`}
+                      >
                         <Phone size={14} /> Call
                       </a>
                     )}
