@@ -32,6 +32,7 @@ import { performanceRoutes } from './routes/performanceRoutes';
 import { learningRoutes } from './routes/learningRoutes';
 import { experienceRoutes } from './routes/experienceRoutes';
 import { operationsRoutes } from './routes/operationsRoutes';
+import { automationRoutes } from './routes/automationRoutes';
 function Protected() {
   const { session, loading, error, refresh } = useAuth(),
     location = useLocation();
@@ -117,6 +118,7 @@ createRoot(document.getElementById('root')).render(
                     {learningRoutes}
                     {experienceRoutes}
                     {operationsRoutes}
+                    {automationRoutes}
                     <Route
                       path="my-work"
                       element={

@@ -105,12 +105,22 @@ export function TravelPage() {
   </Page>;
 }
 export function TravelDetailPage() {
+  const [editItinerary, setEditItinerary] = useState(false);
   const { uuid } = useParams(); const detail = useList(paths.trip(uuid)); const t = detail.data; const [action, setAction] = useState(null); const work = useDo();
   return <Page module="travel" title={t?.destination || 'Travel request'} description="Requested travel dates, budget and decision."><Link to="/travel" className="mb-4 inline-block text-sm underline">All trips</Link><Result resource={detail}>{t && <Card title={t.purpose} action={<StatusBadge value={t.status} />}>
     <p>{t.starts_on} – {t.ends_on} · {t.timezone}</p><p>Estimated budget: {t.currency} {t.budget}</p><p className="text-xs">Approval authorizes this request; bookings, advances and payments are tracked separately.</p>
     <div className="flex flex-wrap gap-2">{t.can_submit && <Button disabled={Boolean(work.busy)} onClick={async () => { const r = await work.run('submit', () => send('POST', paths.trip(uuid, 'actions'), { action: 'submit' }), 'Travel request submitted'); if (r) detail.reload(); }}>Submit request</Button>}
       {t.can_review && <><Button onClick={() => setAction('approve')}>Approve trip</Button><Button variant="secondary" onClick={() => setAction('reject')}>Reject trip</Button></>}{t.can_cancel && <Button variant="secondary" onClick={() => setAction('cancel')}>Cancel trip</Button>}</div>
+    <h2 className="mt-4 font-semibold">Itinerary</h2>
+    {(t.itinerary || []).map((leg, i) => <div key={i} className="my-3 text-sm"><p>{leg.origin} → {leg.destination}</p><p>{leg.departure} ({leg.departure_timezone})</p><p>{leg.arrival} ({leg.arrival_timezone})</p></div>)}
+    {!t.itinerary?.length && <p className="text-sm">No itinerary legs recorded.</p>}
+    {t.can_submit && <Button variant="secondary" onClick={() => setEditItinerary(true)}>Edit itinerary</Button>}
     {t.decision_reason && <p className="mt-3 text-sm">Decision: {t.decision_reason}</p>}
   </Card>}</Result><FormModal open={Boolean(action)} onClose={() => setAction(null)} title="Record travel decision" fields={[{ name: 'reason', label: 'Reason', textarea: true }]}
-    onSubmit={async (v) => { const r = await send('POST', paths.trip(uuid, 'actions'), { ...v, action }); detail.reload(); return r; }} success="Travel request updated" /></Page>;
+    onSubmit={async (v) => { const r = await send('POST', paths.trip(uuid, 'actions'), { ...v, action }); detail.reload(); return r; }} success="Travel request updated" />
+    <FormModal open={editItinerary} onClose={() => setEditItinerary(false)} title="Edit itinerary" initial={{ legs: t?.itinerary || [], version: t?.itinerary_version }} fields={[]}
+      intro="Enter timestamps with an explicit offset, for example 2026-11-01T09:00:00+05:30, and the matching timezone, such as Asia/Kolkata. Legs must fit the trip dates in the trip timezone."
+      extra={(v, set) => <>{(v.legs || []).map((leg, index) => <fieldset key={index} className="mb-4 rounded border p-3"><legend>Leg {index + 1}</legend>{[['origin', 'Origin'], ['destination', 'Destination'], ['departure', 'Departure timestamp'], ['departure_timezone', 'Departure timezone'], ['arrival', 'Arrival timestamp'], ['arrival_timezone', 'Arrival timezone']].map(([key, label]) => <Input key={key} label={`${label} ${index + 1}`} required value={leg[key]} onChange={(e) => set('legs', v.legs.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l))} />)}<Button variant="secondary" onClick={() => set('legs', v.legs.filter((_, i) => i !== index))}>Remove leg {index + 1}</Button></fieldset>)}<Button variant="secondary" disabled={v.legs?.length >= 20} onClick={() => set('legs', [...(v.legs || []), { origin: '', destination: '', departure: '', arrival: '', departure_timezone: '', arrival_timezone: '' }])}>Add leg</Button></>}
+      onSubmit={async (v) => { const r = await send('PUT', paths.trip(uuid, 'itinerary'), v); detail.reload(); return r; }} success="Itinerary saved" />
+    </Page>;
 }

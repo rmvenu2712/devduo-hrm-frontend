@@ -199,7 +199,7 @@ function SettingsForm({ data }) {
                 ['notifications', 'Notification center'],
                 ['people', 'People'], ['attendance', 'Attendance'], ['leave', 'Leave'], ['payroll', 'Payroll'],
                 ['recruitment', 'Recruitment'], ['lifecycle', 'Lifecycle'], ['performance', 'Performance'],
-                ['learning', 'Learning'], ['experience', 'Employee experience'], ['assets', 'Assets'], ['expenses', 'Expenses'], ['travel', 'Travel'],
+                ['learning', 'Learning'], ['experience', 'Employee experience'], ['assets', 'Assets'], ['expenses', 'Expenses'], ['travel', 'Travel'], ['workflows', 'Workflows'], ['analytics', 'Analytics'],
               ].map(([value, label]) => (
                 <div
                   className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 py-4"

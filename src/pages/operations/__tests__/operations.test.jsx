@@ -11,6 +11,20 @@ import { calls, mockApi } from '../../payroll/__tests__/helpers';
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const wrap = (ui, route, path) => <ToastProvider><MemoryRouter initialEntries={[path]}><Routes><Route path={route} element={ui} /></Routes></MemoryRouter></ToastProvider>;
 describe('Assets, expenses and travel', () => {
+  it('saves itinerary legs with explicit offsets and the loaded version', async () => {
+    permissions = ['travel.self'];
+    mockApi(api, { '/requests/t1/itinerary': { uuid: 't1' }, '/requests/t1': { uuid: 't1', destination: 'London', purpose: 'Workshop', status: 'draft', can_submit: true, itinerary: [], itinerary_version: 2 } });
+    render(wrap(<TravelDetailPage />, '/travel/:uuid', '/travel/t1'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit itinerary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add leg' }));
+    const fields = { 'Origin 1': 'Chennai', 'Destination 1': 'London', 'Departure timestamp 1': '2026-11-01T09:00:00+05:30', 'Arrival timestamp 1': '2026-11-01T15:00:00+00:00', 'Departure timezone 1': 'Asia/Kolkata', 'Arrival timezone 1': 'Europe/London' };
+    Object.entries(fields).forEach(([label, value]) => fireEvent.change(screen.getByLabelText(label), { target: { value } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Itinerary saved')).toBeInTheDocument();
+    const request = calls(api, '/requests/t1/itinerary', 'PUT')[0][1];
+    expect(request.method).toBe('PUT');
+    expect(request.body).toEqual({ version: 2, legs: [{ origin: 'Chennai', destination: 'London', departure: fields['Departure timestamp 1'], arrival: fields['Arrival timestamp 1'], departure_timezone: 'Asia/Kolkata', arrival_timezone: 'Europe/London' }] });
+  });
   it('acknowledges an asset with its current version and hides inventory controls from employees', async () => {
     permissions = ['assets.self'];
     mockApi(api, { '/assets/a1/actions': { uuid: 'a1' }, '/assets/a1': { uuid: 'a1', name: 'Laptop', identifier: 'LAP-1', status: 'assigned', version: 3, can_acknowledge: true, movements: [] } });

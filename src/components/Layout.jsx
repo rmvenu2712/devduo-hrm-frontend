@@ -40,6 +40,7 @@ import { performanceNavItem } from '../routes/performanceRoutes';
 import { learningNavItem } from '../routes/learningRoutes';
 import { experienceNavItem } from '../routes/experienceRoutes';
 import { operationsNavItems } from '../routes/operationsRoutes';
+import { automationNavItems } from '../routes/automationRoutes';
 import { Avatar, Badge, Button, Dropdown, Drawer, Breadcrumb, useToast } from './ui';
 export const organizationTypes = {
   'legal-entities': 'Legal entities',
@@ -100,6 +101,7 @@ export default function Layout() {
     learningNavItem,
     experienceNavItem,
     ...operationsNavItems,
+    ...automationNavItems,
   ];
   const admin = [
     { to: '/users', label: 'People & access', icon: Users, permission: 'users.view' },
