@@ -219,7 +219,7 @@ export const cents = (v) => {
 };
 /** True when an amendment of an open requisition needs an independent approver (mirrors RequisitionVersionService). */
 export function needsReapproval(req, changes) {
-  if (req.status !== 'open') return false;
+  if (req?.status !== 'open') return false;
   if (changes.openings != null && Number(changes.openings) > Number(req.openings)) return true;
   const hadBudget = req.budget_amount != null && req.budget_amount !== '';
   if (changes.budget_amount != null && cents(changes.budget_amount) > cents(req.budget_amount)) return true;

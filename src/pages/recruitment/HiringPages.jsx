@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Pagination, useToast } from '../../components/ui';
 import { Amount, Banner, ConfirmDialog, FormModal, ListCard, Page, StatusBadge, optionsOf, useOptions, useOrg } from '../../components/recruitment/kit';
+import { AmendDialog, VersionsDrawer } from '../../components/recruitment/RequisitionVersions';
 import { useAuth } from '../../lib/auth';
 import { clean, newKey, pageOf, paths, send, titleCase, today, useList } from '../../lib/recruitmentApi';
 
@@ -22,7 +23,15 @@ export function RequisitionsPage() {
   const [jobForm, setJobForm] = useState(false);
   const [decision, setDecision] = useState(null);
   const [closing, setClosing] = useState(null);
+  const [amending, setAmending] = useState(null);
+  const [versions, setVersions] = useState(null);
+  const pipelines = useList(paths.pipelines);
   const manage = can('recruitment.manage');
+  const seen = new Set();
+  const pipelineOptions = [
+    { value: '', label: 'Default pipeline' },
+    ...pipelines.rows.filter((p) => p.status === 'active' && !seen.has(p.code) && seen.add(p.code)).map((p) => ({ value: p.code, label: `${p.name} (${p.code})${p.is_default ? ' - default' : ''}` })),
+  ];
   const none = (o) => [{ value: '', label: 'None' }, ...o];
 
   const actions = (r) => (
@@ -37,6 +46,8 @@ export function RequisitionsPage() {
           <span className="text-[11px] text-slate-500 dark:text-slate-400">Another approver is needed</span>
         ))}
       {manage && ['pending', 'open'].includes(r.status) && <Button variant="secondary" onClick={() => setClosing(r)}>Close</Button>}
+      {manage && ['pending', 'open'].includes(r.status) && <Button variant="secondary" onClick={() => setAmending(r)} aria-label={`Amend ${r.title}`}>Amend</Button>}
+      <Button variant="secondary" onClick={() => setVersions(r)} aria-label={`Versions of ${r.title}`}>Versions</Button>
       {r.status === 'open' && <Link className="text-xs font-medium text-brand-700 underline dark:text-brand-300" to={`/recruitment/pipeline/${r.uuid}`}>Pipeline</Link>}
     </div>
   );
@@ -59,8 +70,9 @@ export function RequisitionsPage() {
         title="Requisitions"
         list={list}
         columns={[
-          { key: 'title', label: 'Role', render: (r) => <>{r.title} <span className="text-slate-400">v{r.job_version}</span>{r.confidential && <span className="ml-1 text-[11px]">(confidential)</span>}</> },
+          { key: 'title', label: 'Role', render: (r) => <>{r.title} <span className="text-slate-400">v{r.job_version}</span>{r.version > 1 && <span className="ml-1 text-[11px] text-slate-500 dark:text-slate-400">(amended, rev {r.version})</span>}{r.confidential && <span className="ml-1 text-[11px]">(confidential)</span>}</> },
           { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
+          { key: 'pipeline', label: 'Pipeline', priority: 'md', render: (r) => r.pipeline_code ?? '—' },
           { key: 'headcount', label: 'Filled / openings', render: headcount },
           { key: 'budget', label: 'Budget', priority: 'md', render: budget },
           { key: 'target_date', label: 'Target date', priority: 'md' },
@@ -98,7 +110,7 @@ export function RequisitionsPage() {
         onClose={() => setForm(false)}
         title="New requisition"
         intro="Approval is needed from someone other than you. Openings may not exceed the position headcount."
-        initial={{ kind: 'new', openings: '1', target_date: today(), budget_currency: '' }}
+        initial={{ kind: 'new', openings: '1', target_date: today(), budget_currency: '', pipeline_code: '' }}
         submitLabel="Submit for approval"
         fields={[
           { name: 'job_uuid', label: 'Job', options: optionsOf(jobs.rows, (j) => `${j.title} v${j.version}`) },
@@ -108,6 +120,7 @@ export function RequisitionsPage() {
           { name: 'location_id', label: 'Location', required: false, options: none(locations) },
           { name: 'recruiter_id', label: 'Recruiter', options: users },
           { name: 'hiring_manager_id', label: 'Hiring manager', options: users },
+          { name: 'pipeline_code', label: 'Hiring pipeline', required: false, options: pipelineOptions },
           { name: 'kind', label: 'Kind', options: KINDS },
           { name: 'openings', label: 'Openings (headcount)', type: 'number' },
           { name: 'target_date', label: 'Target date', type: 'date' },
@@ -122,6 +135,8 @@ export function RequisitionsPage() {
         }}
         success="Requisition submitted"
       />
+      <AmendDialog req={amending} departments={departments} locations={locations} onClose={() => setAmending(null)} onDone={list.reload} />
+      <VersionsDrawer req={versions} onClose={() => setVersions(null)} onChanged={list.reload} />
       <ConfirmDialog
         open={Boolean(decision)}
         onClose={() => setDecision(null)}

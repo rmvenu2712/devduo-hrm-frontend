@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Button, Modal, Skeleton, ErrorState, EmptyState, Card } from '../../components/ui';
 import { Banner, FormModal, ListCard, Page, StatusBadge, optionsOf, useAll } from '../../components/recruitment/kit';
 import { useAuth } from '../../lib/auth';
-import { STAGES, clean, fmtDate, newKey, paths, send, titleCase, useList } from '../../lib/recruitmentApi';
+import { clean, stagesFor, fmtDate, newKey, paths, send, titleCase, useList } from '../../lib/recruitmentApi';
 import { api } from '../../lib/api';
 import { useEffect } from 'react';
 
@@ -70,8 +70,12 @@ function HistoryDrawer({ app, onClose }) {
   );
 }
 
-function AppCard({ app, manage, onMove, onHistory }) {
-  const next = STAGES[STAGES.indexOf(app.stage) + 1];
+function AppCard({ app, manage, stages, onMove, onHistory }) {
+  const at = stages.findIndex((s) => s.code === app.stage);
+  const nextStage = at >= 0 ? stages[at + 1] : null;
+  // hired / rejected stages are never reached by a plain move
+  const next = nextStage && ['active', 'offer'].includes(nextStage.kind) ? nextStage.code : null;
+  const nextLabel = nextStage?.label ?? titleCase(next ?? '');
   return (
     <li className="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
       <Link className="text-sm font-semibold underline" to={`/recruitment/candidates/${app.candidate_uuid}`}>
@@ -82,8 +86,8 @@ function AppCard({ app, manage, onMove, onHistory }) {
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {manage && next && (
-          <Button variant="secondary" onClick={() => onMove(app, { stage: next, status: 'active' })} aria-label={`Move ${app.candidate_name} to ${titleCase(next)}`}>
-            Move to {titleCase(next)}
+          <Button variant="secondary" onClick={() => onMove(app, { stage: next, status: 'active' })} aria-label={`Move ${app.candidate_name} to ${nextLabel}`}>
+            Move to {nextLabel}
           </Button>
         )}
         {manage && (
@@ -106,10 +110,12 @@ export function PipelinePage() {
   const all = useAll(paths.applications);
   const candidates = useAll(paths.candidates);
   const reqs = useList(`${paths.requisitions}?page=1`);
+  const pipelines = useList(paths.pipelines);
   const [move, setMove] = useState(null);
   const [history, setHistory] = useState(null);
   const [add, setAdd] = useState(false);
   const req = reqs.rows.find((r) => r.uuid === uuid);
+  const stages = stagesFor(req, pipelines.rows);
   const apps = all.rows.filter((a) => a.requisition_uuid === uuid);
   const active = apps.filter((a) => a.status === 'active');
   const closed = apps.length - active.length;
@@ -129,20 +135,22 @@ export function PipelinePage() {
         <Card><EmptyState title="No candidates in this pipeline" description={manage ? 'Add a candidate to start.' : 'Applications will appear here.'} /></Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-5" role="list" aria-label="Pipeline stages">
-            {STAGES.map((stage) => {
+          <div className="grid gap-4 md:auto-cols-[minmax(11rem,1fr)] md:grid-flow-col md:overflow-x-auto" role="list" aria-label="Pipeline stages">
+            {stages.map((st) => {
+              const stage = st.code;
               const here = active.filter((a) => a.stage === stage);
               return (
-                <section key={stage} role="listitem" aria-label={`${titleCase(stage)} stage`} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+                <section key={stage} role="listitem" aria-label={`${st.label ?? titleCase(stage)} stage`} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
                   <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    {titleCase(stage)} <span className="font-normal">({here.length})</span>
+                    {st.label ?? titleCase(stage)} <span className="font-normal">({here.length})</span>
+                    {st.sla_hours ? <span className="ml-1 font-normal normal-case">SLA {st.sla_hours} h</span> : null}
                   </h3>
                   {here.length === 0 ? (
                     <p className="m-0 text-xs text-slate-500 dark:text-slate-400">No one here</p>
                   ) : (
                     <ul className="m-0 grid list-none gap-2 p-0">
                       {here.map((a) => (
-                        <AppCard key={a.uuid} app={a} manage={manage} onMove={(app, to) => setMove({ app, ...to })} onHistory={setHistory} />
+                        <AppCard key={a.uuid} app={a} manage={manage} stages={stages} onMove={(app, to) => setMove({ app, ...to })} onHistory={setHistory} />
                       ))}
                     </ul>
                   )}
@@ -157,7 +165,7 @@ export function PipelinePage() {
       <FormModal
         open={Boolean(move)}
         onClose={() => setMove(null)}
-        title={move?.status === 'rejected' ? `Reject ${move?.app.candidate_name}` : `Move ${move?.app.candidate_name} to ${titleCase(move?.stage ?? '')}`}
+        title={move?.status === 'rejected' ? `Reject ${move?.app.candidate_name}` : `Move ${move?.app.candidate_name} to ${stages.find((s) => s.code === move?.stage)?.label ?? titleCase(move?.stage ?? '')}`}
         intro="The reason is saved in the application history."
         submitLabel={move?.status === 'rejected' ? 'Reject' : 'Move'}
         fields={[{ name: 'reason', label: 'Reason', textarea: true }]}

@@ -6,6 +6,7 @@ import { RequisitionsPage, PostingsPage } from '../pages/recruitment/HiringPages
 import { CandidatesPage, CandidateProfilePage } from '../pages/recruitment/CandidatePages';
 import CandidateImportPage from '../pages/recruitment/CandidateImportPage';
 import { PipelineIndexPage, PipelinePage } from '../pages/recruitment/PipelinePages';
+import PipelineAdminPage from '../pages/recruitment/PipelineAdminPage';
 import InterviewsPage from '../pages/recruitment/InterviewsPage';
 import OffersPage from '../pages/recruitment/OffersPage';
 import OfferTemplatesPage from '../pages/recruitment/OfferTemplatesPage';
@@ -31,6 +32,7 @@ export const recruitmentRoutes = (
     <Route path="candidates/:uuid" element={<CandidateProfilePage />} />
     <Route path="pipeline" element={<PipelineIndexPage />} />
     <Route path="pipeline/:uuid" element={<PipelinePage />} />
+    <Route path="pipelines" element={<PipelineAdminPage />} />
     <Route path="interviews" element={<InterviewsPage />} />
     <Route path="offers" element={<OffersPage />} />
     <Route path="offer-templates" element={<OfferTemplatesPage />} />

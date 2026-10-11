@@ -44,7 +44,7 @@ describe('Recruitment navigation', () => {
   it('shows only sections the permissions unlock', () => {
     perms = ['recruitment.view'];
     show();
-    expect(links()).toEqual(['Requisitions', 'Job postings', 'Candidates', 'Pipeline', 'Interviews']);
+    expect(links()).toEqual(['Requisitions', 'Job postings', 'Candidates', 'Pipeline', 'Pipeline setup', 'Interviews']);
   });
   it('shows offers and analytics only with their keys', () => {
     perms = ['recruitment.offer.approve', 'recruitment.reports.view'];
