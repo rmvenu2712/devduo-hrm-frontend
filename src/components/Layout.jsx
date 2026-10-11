@@ -41,6 +41,7 @@ import { learningNavItem } from '../routes/learningRoutes';
 import { experienceNavItem } from '../routes/experienceRoutes';
 import { operationsNavItems } from '../routes/operationsRoutes';
 import { automationNavItems } from '../routes/automationRoutes';
+import { enterpriseNavItems } from '../routes/enterpriseRoutes';
 import { Avatar, Badge, Button, Dropdown, Drawer, Breadcrumb, useToast } from './ui';
 export const organizationTypes = {
   'legal-entities': 'Legal entities',
@@ -82,18 +83,78 @@ export default function Layout() {
     toast = useToast();
   const nav = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
-    { to: '/my-work', label: 'My Work', icon: CheckSquare, permission: 'work.view', module: 'work' },
-    { to: '/my-profile', label: 'My profile', icon: UserRound, permission: 'people.view|people.directory', module: 'people' },
-    { to: '/directory', label: 'People directory', icon: Users, permission: 'people.directory', module: 'people' },
+    {
+      to: '/my-work',
+      label: 'My Work',
+      icon: CheckSquare,
+      permission: 'work.view',
+      module: 'work',
+    },
+    {
+      to: '/my-profile',
+      label: 'My profile',
+      icon: UserRound,
+      permission: 'people.view|people.directory',
+      module: 'people',
+    },
+    {
+      to: '/directory',
+      label: 'People directory',
+      icon: Users,
+      permission: 'people.directory',
+      module: 'people',
+    },
     { to: '/people', label: 'Employees', icon: Users, permission: 'people.view', module: 'people' },
-    { to: '/people/org-chart', label: 'Org chart', icon: Network, permission: 'people.view|people.directory', module: 'people' },
-    { to: '/people/action-center', label: 'People actions', icon: ListChecks, permission: 'people.quality.view', module: 'people' },
-    { to: '/people/changes', label: 'Profile changes', icon: FilePen, permission: 'people.changes.approve', module: 'people' },
-    { to: '/attendance', label: 'My attendance', icon: CalendarCheck, permission: 'attendance.view', module: 'attendance' },
-    { to: '/attendance/team', label: 'Team attendance', icon: UsersRound, permission: 'attendance.team.view', module: 'attendance' },
-    { to: '/time-office', label: 'Time office', icon: Clock, permission: TIME_OFFICE_ACCESS, module: 'attendance' },
+    {
+      to: '/people/org-chart',
+      label: 'Org chart',
+      icon: Network,
+      permission: 'people.view|people.directory',
+      module: 'people',
+    },
+    {
+      to: '/people/action-center',
+      label: 'People actions',
+      icon: ListChecks,
+      permission: 'people.quality.view',
+      module: 'people',
+    },
+    {
+      to: '/people/changes',
+      label: 'Profile changes',
+      icon: FilePen,
+      permission: 'people.changes.approve',
+      module: 'people',
+    },
+    {
+      to: '/attendance',
+      label: 'My attendance',
+      icon: CalendarCheck,
+      permission: 'attendance.view',
+      module: 'attendance',
+    },
+    {
+      to: '/attendance/team',
+      label: 'Team attendance',
+      icon: UsersRound,
+      permission: 'attendance.team.view',
+      module: 'attendance',
+    },
+    {
+      to: '/time-office',
+      label: 'Time office',
+      icon: Clock,
+      permission: TIME_OFFICE_ACCESS,
+      module: 'attendance',
+    },
     ...leaveNavItems,
-    { to: '/leave/hr', label: 'Leave operations', icon: CalendarClock, permission: LEAVE_HR_ACCESS, module: 'leave' },
+    {
+      to: '/leave/hr',
+      label: 'Leave operations',
+      icon: CalendarClock,
+      permission: LEAVE_HR_ACCESS,
+      module: 'leave',
+    },
     payrollNavItem,
     recruitmentNavItem,
     lifecycleNavItem,
@@ -102,11 +163,18 @@ export default function Layout() {
     experienceNavItem,
     ...operationsNavItems,
     ...automationNavItems,
+    ...enterpriseNavItems,
   ];
   const admin = [
     { to: '/users', label: 'People & access', icon: Users, permission: 'users.view' },
     { to: '/roles', label: 'Roles & permissions', icon: ShieldCheck, permission: 'roles.manage' },
-    { to: '/people/settings', label: 'People settings', icon: SlidersHorizontal, permission: 'people.settings', module: 'people' },
+    {
+      to: '/people/settings',
+      label: 'People settings',
+      icon: SlidersHorizontal,
+      permission: 'people.settings',
+      module: 'people',
+    },
     { to: '/audit', label: 'Audit log', icon: ScrollText, permission: 'audit.view' },
     { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings.manage' },
   ];

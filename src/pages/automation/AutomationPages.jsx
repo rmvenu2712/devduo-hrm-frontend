@@ -61,7 +61,7 @@ const newStep = () => ({
   worker_type: '',
 });
 const opts = (values) => values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
-function Designer({ values, set, users, employees = [] }) {
+function Designer({ values, set, users, employees = [], eventTypes = [] }) {
   const steps = values.spec?.steps || [];
   const trigger = values.spec?.trigger || { type: 'manual' };
   const changeTrigger = (key, value) =>
@@ -88,10 +88,47 @@ function Designer({ values, set, users, employees = [] }) {
         }
       />
       {trigger.type === 'event' && (
-        <p className="text-sm">
-          Starts for new EmployeeCreated events after publication. Runs with the publishing
-          administrator's current permissions.
-        </p>
+        <>
+          <Select
+            label="Source event"
+            required
+            value={trigger.event_type || 'EmployeeCreated'}
+            options={eventTypes}
+            onChange={(e) =>
+              set('spec', {
+                ...values.spec,
+                trigger: {
+                  ...trigger,
+                  event_type: e.target.value,
+                  status: e.target.value === 'EmploymentStatusChanged' ? 'active' : undefined,
+                },
+              })
+            }
+          />
+          {trigger.event_type === 'EmploymentStatusChanged' && (
+            <Select
+              label="Start only when the new status is"
+              required
+              value={trigger.status || 'active'}
+              options={opts([
+                'preboarding',
+                'active',
+                'probation',
+                'notice_period',
+                'suspended',
+                'long_leave',
+                'inactive',
+                'separated',
+                'archived',
+              ])}
+              onChange={(e) => changeTrigger('status', e.target.value)}
+            />
+          )}
+          <p className="text-sm">
+            Starts for matching employee-linked events after publication. Runs with the publishing
+            administrator's current permissions.
+          </p>
+        </>
       )}
       {trigger.type === 'schedule' && (
         <>
@@ -175,6 +212,42 @@ function Designer({ values, set, users, employees = [] }) {
             ]}
             onChange={(e) => change(i, 'mode', e.target.value)}
           />
+          {['approval', 'task'].includes(step.action) && (
+            <div className="my-3 border-t pt-3">
+              <p className="text-xs font-semibold">Deadline escalation (optional)</p>
+              {users.map((u) => (
+                <label
+                  key={'escalate-' + u.id}
+                  className="mr-3 inline-flex items-center gap-1 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={(step.escalation_assignees || []).includes(u.id)}
+                    onChange={(e) =>
+                      change(
+                        i,
+                        'escalation_assignees',
+                        e.target.checked
+                          ? [...(step.escalation_assignees || []), u.id]
+                          : (step.escalation_assignees || []).filter((id) => id !== u.id),
+                      )
+                    }
+                  />
+                  {u.name}
+                </label>
+              ))}
+              {(step.escalation_assignees || []).length > 0 && (
+                <Input
+                  label={'Escalation deadline hours ' + (i + 1)}
+                  type="number"
+                  min="1"
+                  max="8760"
+                  value={step.escalation_hours || 24}
+                  onChange={(e) => change(i, 'escalation_hours', Number(e.target.value))}
+                />
+              )}
+            </div>
+          )}
           <Input
             label={'Deadline or wait hours ' + (i + 1)}
             type="number"
@@ -331,6 +404,7 @@ export function WorkflowsPage() {
                 values={v}
                 set={set}
                 users={options.data?.users || []}
+                eventTypes={options.data?.event_types || []}
                 employees={(options.data?.employees || []).map((e) => ({
                   value: e.uuid,
                   label: e.employee_number,
@@ -487,6 +561,7 @@ export function WorkflowDefinitionPage() {
                 set={set}
                 users={options.data?.users || []}
                 employees={employees}
+                eventTypes={options.data?.event_types || []}
               />
             )}
           </Result>
@@ -509,6 +584,8 @@ export function WorkflowInstancePage() {
   const detail = useList(W + '/instances/' + uuid);
   const i = detail.data;
   const [action, setAction] = useState(null);
+  const [delegating, setDelegating] = useState(false);
+  const delegates = useList(delegating ? W + '/instances/' + uuid + '/delegates' : null);
   return (
     <Page
       module="workflows"
@@ -541,6 +618,9 @@ export function WorkflowInstancePage() {
                     </Button>
                     <Button variant="secondary" onClick={() => setAction('rejected')}>
                       Reject
+                    </Button>
+                    <Button variant="secondary" onClick={() => setDelegating(true)}>
+                      Delegate
                     </Button>
                   </>
                 )}
@@ -597,10 +677,50 @@ export function WorkflowInstancePage() {
         }}
         success="Workflow updated"
       />
+      <FormModal
+        open={delegating}
+        onClose={() => setDelegating(false)}
+        title="Delegate workflow assignment"
+        intro="Only an eligible workspace user who has not already participated in this step can receive the assignment."
+        fields={[
+          {
+            name: 'to_user_id',
+            label: 'New assignee',
+            options: delegates.rows.map((u) => ({ value: u.id, label: u.name })),
+          },
+          { name: 'reason', label: 'Reason', textarea: true },
+        ]}
+        extra={() =>
+          delegates.error ? <ErrorState error={delegates.error} onRetry={delegates.reload} /> : null
+        }
+        onSubmit={async (v) => {
+          const r = await send('POST', W + '/instances/' + uuid + '/delegate', {
+            ...v,
+            from_user_id: i.my_assignment_user_id,
+          });
+          detail.reload();
+          return r;
+        }}
+        success="Assignment delegated"
+      />
     </Page>
   );
 }
 function ReportResult({ result }) {
+  const display = (value) => {
+    if (value && typeof value === 'object') {
+      if ('gross' in value && 'net' in value)
+        return (
+          <span>
+            {value.gross} gross · {value.net} net · Gross change{' '}
+            {value.gross_change_percent ?? 'not available'}% · Net change{' '}
+            {value.net_change_percent ?? 'not available'}%
+          </span>
+        );
+      return JSON.stringify(value);
+    }
+    return value ?? 'Not available';
+  };
   return (
     result && (
       <Card title={result.label} className="mt-4">
@@ -616,7 +736,7 @@ function ReportResult({ result }) {
             {result.rows.map((r, i) => (
               <tr key={i}>
                 <td>{r.group}</td>
-                <td>{r.suppressed ? 'Suppressed — small cohort' : (r.value ?? 'Not available')}</td>
+                <td>{r.suppressed ? 'Suppressed — small cohort' : display(r.value)}</td>
               </tr>
             ))}
           </tbody>

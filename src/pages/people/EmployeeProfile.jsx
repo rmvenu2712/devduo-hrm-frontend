@@ -104,7 +104,7 @@ function TabBody({ tab, uuid, profile, sections, edit, canView, tabs, onGo, relo
     case 'documents':
       return <DocumentsPanel uuid={uuid} mode={edit.document || 'none'} />;
     case 'identity':
-      return <SensitivePanel uuid={uuid} sections={sections} />;
+      return <SensitivePanel uuid={uuid} sections={sections} edit={edit} />;
     case 'notes':
       return <NotesPanel uuid={uuid} />;
     case 'timeline':
