@@ -3,7 +3,7 @@ import { ScrollText } from 'lucide-react';
 import Access from '../components/Access';
 import PayrollLayout, { PayrollHome } from '../pages/payroll/PayrollLayout';
 import { CommandCenterPage, ReadinessPage } from '../pages/payroll/OverviewPages';
-import { MyPayslipsPage, MyPayslipDetailPage, MyCompensationPage, MyLoansPage, MyTaxPage } from '../pages/payroll/SelfPages';
+import { MyPayslipsPage, MyPayslipDetailPage, MyCompensationPage, MyBenefitsPage, MyLoansPage, MyTaxPage } from '../pages/payroll/SelfPages';
 import { GroupsPage, PeriodsPage } from '../pages/payroll/SetupPages';
 import CompensationPage from '../pages/payroll/CompensationPage';
 import { ComponentsPage, StructuresPage } from '../pages/payroll/ComponentPages';
@@ -15,6 +15,7 @@ import { PaymentsPage, PaymentDetailPage } from '../pages/payroll/PaymentsPages'
 import AccountingPage from '../pages/payroll/AccountingPage';
 import ReportsPage from '../pages/payroll/ReportsPage';
 import SettlementPage from '../pages/payroll/SettlementPage';
+import BenefitsAdminPage from '../pages/payroll/BenefitsAdminPage';
 import { PAYROLL_ACCESS } from '../lib/payrollApi';
 
 export { PAYROLL_ACCESS };
@@ -36,6 +37,8 @@ export const payrollRoutes = (
     <Route path="my/payslips/:uuid" element={<MyPayslipDetailPage />} />
     <Route path="my/compensation" element={<MyCompensationPage />} />
     <Route path="my/loans" element={<MyLoansPage />} />
+    <Route path="my/benefits" element={<MyBenefitsPage />} />
+    <Route path="benefits" element={<BenefitsAdminPage />} />
     <Route path="my/tax" element={<MyTaxPage />} />
     <Route path="groups" element={<GroupsPage />} />
     <Route path="periods" element={<PeriodsPage />} />

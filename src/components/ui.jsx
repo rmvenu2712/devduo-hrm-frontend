@@ -570,10 +570,11 @@ export function FormError({ error }) {
   ) : null;
 }
 const ToastContext = createContext(null);
+let toastSequence = 0;
 export function ToastProvider({ children }) {
   const [toasts, set] = useState([]);
   const notify = (message, tone = 'success') => {
-    const id = crypto.randomUUID();
+    const id = globalThis.crypto?.randomUUID?.() ?? `toast-${Date.now()}-${++toastSequence}`;
     set((t) => [...t, { id, message, tone }]);
     setTimeout(() => set((t) => t.filter((x) => x.id !== id)), 5000);
   };

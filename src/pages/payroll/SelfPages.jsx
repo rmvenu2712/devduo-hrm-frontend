@@ -185,6 +185,36 @@ export function MyCompensationPage() {
   );
 }
 
+export function MyBenefitsPage() {
+  const available = useList(paths.benefitPlansAvailable);
+  const enrollments = useList(paths.meBenefits);
+  const [plan, setPlan] = useState(null);
+  const [ending, setEnding] = useState(null);
+  return <Page permission="payroll.benefits.view_own|payroll.benefits.enroll_own" title="My benefits" description="Review eligible plans and track your enrollment requests.">
+    <ListCard title="Available plans" list={available} columns={[
+      { key: 'name', label: 'Plan' }, { key: 'category', label: 'Category', render: (r) => titleCase(r.category) }, { key: 'currency', label: 'Currency' },
+      { key: 'windows', label: 'Enrollment', render: (r) => r.windows?.map((w) => `${w.name} (${w.closes_on})`).join(', ') || 'Closed' },
+      { key: 'act', label: '', render: (r) => <Button disabled={!r.windows?.length} onClick={() => setPlan(r)}>Enroll</Button> },
+    ]} empty={{ title: 'No plans available', description: 'Eligible plans appear during their enrollment window.' }} />
+    <ListCard title="My enrollment requests" list={enrollments} columns={[
+      { key: 'plan', label: 'Plan' }, { key: 'category', label: 'Category', render: (r) => titleCase(r.category) }, { key: 'effective_from', label: 'Effective' }, { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
+      { key: 'ending', label: '', render: (r) => r.status === 'active' ? <Button variant="secondary" onClick={() => setEnding(r)}>Request end</Button> : null },
+    ]} empty={{ title: 'No enrollments', description: 'Your submitted and active benefits will appear here.' }} />
+    <FormModal open={Boolean(plan)} onClose={() => setPlan(null)} title={`Enroll in ${plan?.name ?? 'benefit'}`} intro="Your contribution follows the plan rules. Your request is sent for independent review." initial={{ window_uuid: plan?.windows?.[0]?.uuid ?? '' }} fields={[
+      { name: 'window_uuid', label: 'Enrollment window', options: plan?.windows?.map((w) => ({ value: w.uuid, label: `${w.name} · effective ${w.effective_on}` })) ?? [] },
+    ]} onSubmit={async (v) => {
+      await api(paths.enrollBenefit(plan.uuid), { method: 'POST', body: v });
+      enrollments.reload();
+    }} success="Enrollment submitted for review" />
+    <FormModal open={Boolean(ending)} onClose={() => setEnding(null)} title={`End ${ending?.plan ?? 'benefit'} coverage`} intro="A benefits manager must review your request. Coverage stays active until approved." fields={[
+      { name: 'effective_to', label: 'Coverage end date', type: 'date' },
+    ]} onSubmit={async (v) => {
+      await api(paths.meBenefitTermination(ending.uuid), { method: 'POST', body: v });
+      enrollments.reload();
+    }} success="Termination request submitted for review" />
+  </Page>;
+}
+
 export function MyLoansPage() {
   const res = useResource(paths.meLoans);
   const d = res.data ? unwrap(res.data) : null;

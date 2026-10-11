@@ -61,6 +61,7 @@ export default function InterviewsPage() {
   const [score, setScore] = useState(null);
   const [view, setView] = useState(null);
   const [cancel, setCancel] = useState(null);
+  const [reschedule, setReschedule] = useState(null);
   const manage = can('recruitment.manage');
   const started = (i) => new Date(i.starts_at) <= new Date();
 
@@ -79,6 +80,7 @@ export default function InterviewsPage() {
           Cancel
         </Button>
       )}
+      {manage && i.status === 'scheduled' && !started(i) && <Button variant="secondary" onClick={() => setReschedule(i)}>Reschedule</Button>}
     </div>
   );
 
@@ -150,6 +152,19 @@ export default function InterviewsPage() {
         ]}
         onSubmit={async (v) => { await send('POST', paths.interview(score.uuid, 'scorecard'), { ...clean(v), rating: Number(v.rating) }); list.reload(); }}
         success="Feedback submitted"
+      />
+      <FormModal
+        open={Boolean(reschedule)} onClose={() => setReschedule(null)} title="Reschedule interview"
+        intro="Choose the new local start and end. Panelists remain assigned and receive an in-app update."
+        initial={{ timezone: reschedule?.timezone || tz() }} submitLabel="Reschedule"
+        fields={[
+          { name: 'starts_at', label: 'New start', type: 'datetime-local' },
+          { name: 'ends_at', label: 'New end', type: 'datetime-local' },
+          { name: 'timezone', label: 'Time zone' },
+          { name: 'reason', label: 'Reason for rescheduling', textarea: true },
+        ]}
+        onSubmit={async (values) => { await send('POST', paths.interview(reschedule.uuid, 'reschedule'), { ...values, expected_starts_at: reschedule.starts_at }); list.reload(); }}
+        success="Interview rescheduled"
       />
       <FeedbackDrawer interview={view} onClose={() => setView(null)} canSeeAll={manage} />
       <ConfirmDialog

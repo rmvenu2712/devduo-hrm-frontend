@@ -12,6 +12,7 @@ import { ToastProvider } from '../../../components/ui';
 import RecruitmentLayout, { RecruitmentHome } from '../RecruitmentLayout';
 import { PipelinePage } from '../PipelinePages';
 import OffersPage from '../OffersPage';
+import InterviewsPage from '../InterviewsPage';
 import { NAV, RECRUITMENT_ACCESS } from '../../../lib/recruitmentApi';
 import { apiError, calls, mockApi } from '../../payroll/__tests__/helpers';
 
@@ -145,6 +146,26 @@ describe('Offers', () => {
     expect(await screen.findByText('The creator cannot approve this offer.')).toBeInTheDocument();
   });
 
+  it('hands over a returning employee with explicit identity confirmation', async () => {
+    perms = ['recruitment.offer.manage', 'recruitment.handover', 'people.rehire', 'people.view'];
+    mockApi(api, { '/employees': page([{ uuid: 'former-1', display_name: 'Asha Rao', employee_number: 'OLD-1' }]), '/handover': { employee_uuid: 'e1' }, '/offers': page([offer({ status: 'accepted' })]), ...lookups });
+    show();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Hand over to employee' }))[0]);
+    const form = screen.getByRole('dialog');
+    fireEvent.click(within(form).getByRole('combobox', { name: /Handover type/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Returning employee' }));
+    fireEvent.change(screen.getByLabelText('Find former employee'), { target: { value: 'Asha' } });
+    await waitFor(() => expect(api.mock.calls.some(([path]) => path.includes('/employees?'))).toBe(true));
+    fireEvent.click(within(form).getByRole('combobox', { name: /Former employee/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Asha Rao (OLD-1)' }));
+    fireEvent.click(screen.getByLabelText(/I verified that this candidate/));
+    ['Department', 'Designation', 'Employee type', 'Location'].forEach((label) => fireEvent.change(within(form).getByLabelText(label), { target: { value: '1' } }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Create employee' }));
+    await waitFor(() => expect(calls(api, '/handover')).toHaveLength(1));
+    expect(calls(api, '/handover')[0][1].body).toMatchObject({ previous_employee_uuid: 'former-1', rehire_identity_confirmed: true });
+    expect(calls(api, '/handover')[0][1].body.confirm_duplicates).toBeUndefined();
+  });
+
   it('asks for confirmation on a possible duplicate before handing over', async () => {
     perms = ['recruitment.offer.manage', 'recruitment.handover'];
     let attempt = 0;
@@ -169,5 +190,21 @@ describe('Offers', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Create anyway' }));
     await waitFor(() => expect(attempt).toBe(2));
     expect(calls(api, '/handover')[1][1].body.confirm_duplicates).toBe(true);
+  });
+});
+
+describe('Interview rescheduling', () => {
+  it('sends local times, the chosen time zone and the previous start to detect stale edits', async () => {
+    perms = ['recruitment.view', 'recruitment.manage'];
+    mockApi(api, { '/reschedule': { uuid: 'i1' }, '/interviews': page([{ uuid: 'i1', candidate_name: 'Asha', round: 'Technical', starts_at: '2099-10-08T04:30:00Z', ends_at: '2099-10-08T05:30:00Z', timezone: 'Asia/Kolkata', status: 'scheduled' }]), '/applications': page([]), '/users': page([]) });
+    render(wrap(<InterviewsPage />, '/recruitment/interviews'));
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Reschedule' }))[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('New start'), { target: { value: '2099-10-09T14:00' } });
+    fireEvent.change(within(dialog).getByLabelText('New end'), { target: { value: '2099-10-09T15:00' } });
+    fireEvent.change(within(dialog).getByLabelText('Reason for rescheduling'), { target: { value: 'Candidate availability' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reschedule' }));
+    await waitFor(() => expect(calls(api, '/reschedule')).toHaveLength(1));
+    expect(calls(api, '/reschedule')[0][1].body).toMatchObject({ starts_at: '2099-10-09T14:00', ends_at: '2099-10-09T15:00', timezone: 'Asia/Kolkata', expected_starts_at: '2099-10-08T04:30:00Z' });
   });
 });

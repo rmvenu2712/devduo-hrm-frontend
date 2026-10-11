@@ -38,7 +38,11 @@ describe('Workflows and analytics', () => {
       '/definitions': { data: [] },
       '/instances': { data: [] },
       '/deliveries': { data: [] },
-      '/options': { users: [{ id: 7, name: 'Reviewer' }], employees: [] },
+      '/options': {
+        users: [{ id: 7, name: 'Reviewer' }],
+        employees: [],
+        event_types: [{ value: 'EmployeeCreated', label: 'EmployeeCreated' }],
+      },
     });
     render(wrap(<WorkflowsPage />, '/workflows', '/workflows'));
     fireEvent.click(await screen.findByRole('button', { name: 'New workflow' }));

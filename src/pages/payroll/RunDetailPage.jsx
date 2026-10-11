@@ -17,6 +17,7 @@ function InputImportPanel({ periodUuid }) {
   const history = useResource(paths.inputImports);
   const [file, setFile] = useState(null);
   const [source, setSource] = useState('bonus');
+  const [mapping, setMapping] = useState({ employee_number: 'employee_number', kind: 'kind', component_code: 'component_code', amount: 'amount', quantity: 'quantity' });
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,6 +26,7 @@ function InputImportPanel({ periodUuid }) {
     setBusy(true); setError('');
     try {
       const body = new FormData(); body.append('file', file); body.append('period_uuid', periodUuid); body.append('source', source);
+      Object.entries(mapping).forEach(([field, header]) => body.append(`mapping[${field}]`, header));
       setPreview(await api(paths.inputImportPreview, { method: 'POST', body }));
       history.reload();
     } catch (e) { setError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
@@ -38,11 +40,17 @@ function InputImportPanel({ periodUuid }) {
     finally { setBusy(false); }
   };
   return <Card title="Import payroll inputs" className="mt-5">
-    <Section><p className="mb-4 text-sm text-slate-500">CSV/XLSX columns: employee_number, kind, and amount or quantity; component_code is optional. Preview does not create payroll inputs.</p>
+    <Section><p className="mb-4 text-sm text-slate-500">Map your file’s headers to payroll input fields. Employee number and kind plus amount or quantity are required. Preview does not create payroll inputs.</p>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="text-sm">File<input className="mt-1 block w-full text-sm" type="file" accept=".csv,.xlsx" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); setError(''); }} /></label>
         <label className="text-sm">Input source<select className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={source} onChange={(e) => setSource(e.target.value)}>{['bonus', 'commission', 'variable_pay', 'reimbursement', 'overtime', 'adjustment', 'manual', 'api'].map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select></label>
       </div>
+      <fieldset className="mt-4 grid gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-2">
+        <legend className="px-1 text-xs font-semibold">Column mapping (case and spaces are normalized)</legend>
+        {Object.entries({ employee_number: 'Employee number', kind: 'Input kind', component_code: 'Component code (optional)', amount: 'Amount', quantity: 'Quantity' }).map(([field, label]) => <label key={field} className="text-xs">{label}
+          <input aria-label={`${label} column`} className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={mapping[field]} onChange={(e) => setMapping((old) => ({ ...old, [field]: e.target.value }))} />
+        </label>)}
+      </fieldset>
       {error && <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button disabled={!file || busy} loading={busy} onClick={upload}>Preview file</Button>

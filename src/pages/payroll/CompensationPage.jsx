@@ -84,6 +84,7 @@ export default function CompensationPage() {
   const [importType, setImportType] = useState('increment');
   const [importDate, setImportDate] = useState('');
   const [importReason, setImportReason] = useState('');
+  const [importMapping, setImportMapping] = useState({ employee_number: 'employee_number', component_code: 'component_code', amount: 'amount' });
   const [importPreview, setImportPreview] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
@@ -110,18 +111,24 @@ export default function CompensationPage() {
       </div>
       {manage && <section className="mb-6 rounded-xl border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="comp-import-title">
         <h2 id="comp-import-title" className="mb-1 text-lg font-semibold">Import compensation revisions</h2>
-        <p className="mb-4 text-sm text-slate-500">Upload a CSV or XLSX with employee_number, component_code, and amount columns. Preview checks rows without submitting revisions.</p>
+        <p className="mb-4 text-sm text-slate-500">Map your CSV/XLSX headers to employee number, component code, and amount. Preview checks rows without submitting revisions.</p>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="text-sm">File<input className="mt-1 block w-full text-sm" type="file" accept=".csv,.xlsx" onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportPreview(null); setImportError(''); }} /></label>
           <label className="text-sm">Revision type<select className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={importType} onChange={(e) => setImportType(e.target.value)}>{TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
           <label className="text-sm">Effective date<input className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} /></label>
           <label className="text-sm">Reason<input className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={importReason} onChange={(e) => setImportReason(e.target.value)} /></label>
         </div>
+        <fieldset className="mt-4 grid gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-3">
+          <legend className="px-1 text-xs font-semibold">Column mapping (case and spaces are normalized)</legend>
+          {Object.entries({ employee_number: 'Employee number', component_code: 'Component code', amount: 'Amount' }).map(([field, label]) => <label key={field} className="text-xs">{label}
+            <input aria-label={`${label} column`} className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-900" value={importMapping[field]} onChange={(e) => setImportMapping((old) => ({ ...old, [field]: e.target.value }))} />
+          </label>)}
+        </fieldset>
         {importError && <p className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">{importError}</p>}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button disabled={!importFile || !importDate || !importReason || importBusy} onClick={async () => {
             setImportBusy(true); setImportError('');
-            try { const body = new FormData(); body.append('file', importFile); body.append('type', importType); body.append('effective_date', importDate); body.append('reason', importReason); setImportPreview(await api(paths.compensationImportPreview, { method: 'POST', body })); }
+            try { const body = new FormData(); body.append('file', importFile); body.append('type', importType); body.append('effective_date', importDate); body.append('reason', importReason); Object.entries(importMapping).forEach(([field, header]) => body.append(`mapping[${field}]`, header)); setImportPreview(await api(paths.compensationImportPreview, { method: 'POST', body })); }
             catch (e) { setImportError(Object.values(e.errors ?? {}).flat().join(' ') || e.message); }
             finally { setImportBusy(false); }
           }}>{importBusy ? 'Working…' : 'Preview import'}</Button>

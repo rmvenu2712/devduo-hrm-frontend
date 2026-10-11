@@ -20,6 +20,7 @@ export { query };
 
 export const P = '/v1/payroll';
 export const C = '/v1/compensation';
+export const B = '/v1/benefits';
 export const paths = {
   commandCenter: `${P}/command-center`,
   readiness: `${P}/readiness`,
@@ -88,6 +89,15 @@ export const paths = {
   meTaxWindows: `${P}/me/tax-declaration-windows`,
   meTaxSchema: `${P}/me/tax-declaration-schema`,
   meTaxDeclarations: `${P}/me/tax-declarations`,
+  benefitPlansAvailable: `${B}/available`,
+  benefitPlans: `${B}/plans`,
+  benefitPlan: (uuid, part) => `${B}/plans/${uuid}${part ? `/${part}` : ''}`,
+  benefitEnrollments: `${B}/enrollments`,
+  benefitEnrollmentDecision: (uuid) => `${B}/enrollments/${uuid}/decision`,
+  benefitTerminationDecision: (uuid) => `${B}/enrollments/${uuid}/termination-decision`,
+  meBenefits: `${B}/me`,
+  meBenefitTermination: (uuid) => `${B}/me/${uuid}/termination`,
+  enrollBenefit: (uuid) => `${B}/plans/${uuid}/enroll`,
 };
 
 export const API_BASE = () => import.meta.env.VITE_API_BASE || '/api';
@@ -104,6 +114,8 @@ export const NAV = [
   { to: '/payroll/my/payslips', label: 'My payslips', permission: 'payroll.payslips.view_own' },
   { to: '/payroll/my/compensation', label: 'My compensation', permission: 'payroll.compensation.view_own' },
   { to: '/payroll/my/loans', label: 'Loans & advances', permission: 'payroll.loans.view_own' },
+  { to: '/payroll/my/benefits', label: 'My benefits', permission: 'payroll.benefits.view_own|payroll.benefits.enroll_own' },
+  { to: '/payroll/benefits', label: 'Benefits admin', permission: 'payroll.benefits.manage' },
   { to: '/payroll/my/tax', label: 'Tax declaration', permission: 'payroll.tax_declaration.submit' },
   { to: '/payroll/groups', label: 'Pay groups', permission: SETUP },
   { to: '/payroll/periods', label: 'Periods', permission: SETUP },

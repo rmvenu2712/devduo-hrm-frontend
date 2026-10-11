@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Pagination, useToast } from '../../components/ui';
+import { EmployeePicker } from '../../components/people/lookups';
 import { Banner, ConfirmDialog, FormModal, ListCard, Page, StatusBadge, optionsOf, useAll, useOrg } from '../../components/recruitment/kit';
 import { useAuth } from '../../lib/auth';
 import { api } from '../../lib/api';
@@ -52,7 +53,7 @@ export default function OffersPage() {
       )}
       {can('recruitment.handover') && o.status === 'accepted' && <Button onClick={() => setHandover(o)}>Hand over to employee</Button>}
       {manage && ['draft', 'pending_approval', 'approved', 'sent'].includes(o.status) && <Button variant="secondary" onClick={() => setAct({ row: o, verb: 'withdraw' })}>Withdraw</Button>}
-      {manage && ['draft', 'rejected', 'declined', 'withdrawn'].includes(o.status) && (
+      {manage && ['draft', 'rejected', 'declined', 'withdrawn', 'expired'].includes(o.status) && (
         <Button variant="secondary" onClick={() => setCreate({ application_uuid: o.application_uuid, job_title: o.job_title, start_date: o.start_date, currency: o.currency ?? '' })}>New version</Button>
       )}
     </div>
@@ -62,6 +63,7 @@ export default function OffersPage() {
     const a = values.assignment;
     const body = clean({
       employee_number: values.employee_number, work_email: values.work_email, worker_type: values.worker_type,
+      ...(values.handover_mode === 'rehire' ? { previous_employee_uuid: values.previous_employee_uuid, rehire_identity_confirmed: values.rehire_identity_confirmed, override_reason: values.override_reason } : {}),
       assignment: clean({ department_id: Number(a.department_id), designation_id: Number(a.designation_id), employee_type_id: Number(a.employee_type_id), location_id: Number(a.location_id) }),
       ...(confirm ? { confirm_duplicates: true } : {}),
     });
@@ -136,10 +138,11 @@ export default function OffersPage() {
         open={Boolean(handover)}
         onClose={() => setHandover(null)}
         title={`Hand over ${handover?.candidate_name ?? ''} to People`}
-        intro="This creates the employee record from the accepted offer. It is safe to retry: one employee per offer."
-        initial={{ assignment: {}, worker_type: 'employee' }}
+        intro="Create a new employment from the accepted offer. For a returning employee, select their most recent former employment to preserve the person record and history."
+        initial={{ assignment: {}, worker_type: 'employee', handover_mode: 'new' }}
         submitLabel="Create employee"
         fields={[
+          ...(can('people.rehire') && can('people.view') ? [{ name: 'handover_mode', label: 'Handover type', options: [{ value: 'new', label: 'New person' }, { value: 'rehire', label: 'Returning employee' }] }] : []),
           { name: 'employee_number', label: 'Employee number', required: false },
           { name: 'work_email', label: 'Work email', type: 'email', required: false },
           { name: 'worker_type', label: 'Worker type', options: ['employee', 'contractor', 'intern'].map((t) => ({ value: t, label: titleCase(t) })) },
@@ -162,6 +165,11 @@ export default function OffersPage() {
             </div>
           );
           return [
+            ...(v.handover_mode === 'rehire' ? [
+              <EmployeePicker key="previous" label="Former employee" required value={v.previous_employee_uuid} onChange={(uuid) => set('previous_employee_uuid', uuid)} />,
+              <label key="identity" className="my-3 flex gap-2 text-sm"><input type="checkbox" required checked={Boolean(v.rehire_identity_confirmed)} onChange={(e) => set('rehire_identity_confirmed', e.target.checked)} />I verified that this candidate and the selected former employee are the same person.</label>,
+              <label key="override" className="mb-4 block text-sm">Rehire eligibility override reason (if needed)<textarea className="mt-1 w-full rounded border p-2" maxLength={1000} value={v.override_reason || ''} onChange={(e) => set('override_reason', e.target.value)} /></label>,
+            ] : []),
             pick('department_id', 'Department', departments),
             pick('designation_id', 'Designation', designations),
             pick('employee_type_id', 'Employee type', types),
